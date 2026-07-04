@@ -283,6 +283,7 @@ function teardownGraph() {
   if (ctx) { try { ctx.onstatechange = null; ctx.close(); } catch (e) { /* ignore */ } }
   ctx = null; tabStream = null; micStream = null; recDest = null; tabLevel = null; micLevel = null;
   audioRecorder = null; videoRecorder = null;
+  micConnected = false; // CRITICAL: without this, every recording after the first skips the mic (silent second run)
 }
 
 function audioWarnings() {
