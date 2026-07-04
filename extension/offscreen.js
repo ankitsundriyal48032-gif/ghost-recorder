@@ -9,7 +9,7 @@
 // auto-stop if the captured tab is closed/navigated; silent-track detection;
 // chunks buffered + audio kept in IndexedDB so a failed AI call can be retried.
 
-let ctx = null, tabStream = null, micStream = null, recDest = null, micConnected = false;
+let ctx = null, tabStream = null, micStream = null, recDest = null, micConnected = false, monitorEl = null;
 let audioRecorder = null, videoRecorder = null, audioChunks = [], videoChunks = [];
 let meetingId = null, stopping = false, recStartMs = 0;
 let levelTimer = null, tabLevel = null, micLevel = null, tabHadAudio = false, micHadAudio = false, tabHadAudioTrack = false;
@@ -194,11 +194,10 @@ async function startRecording(streamId, videoEnabled, id) {
     log(`captured tracks — video:${tabStream.getVideoTracks().length} audio:${tabAudio.length}`);
     tabStream.getTracks().forEach((t) => { t.onended = onTabEnded; });
 
-    // 'playback' latency = larger render buffers. The offscreen page is hidden and
-    // CPU-throttled; with default 'interactive' buffers the graph underruns under
-    // continuous audio -> crackling ("chhid-chhid") in BOTH the monitor and the file
-    // (verified: 29 micro-gaps in a YouTube capture). Costs ~0.1s monitor delay.
-    ctx = new AudioContext({ latencyHint: 'playback', sampleRate: 48000 });
+    // 'playback' latency = larger render buffers (hidden page is CPU-throttled; the
+    // default 'interactive' buffers underran -> crackle). No forced sampleRate: on
+    // 44.1kHz output devices a forced 48k context resamples on the fly = more glitches.
+    ctx = new AudioContext({ latencyHint: 'playback' });
     if (ctx.state === 'suspended') await ctx.resume();
     // If the OS suspends the AudioContext when the window is minimized, resume it so recording doesn't drop out.
     ctx.onstatechange = () => { if (ctx && ctx.state === 'suspended' && !stopping) ctx.resume().catch(() => {}); };
@@ -207,9 +206,14 @@ async function startRecording(streamId, videoEnabled, id) {
     if (tabAudio.length) {
       const tabNode = ctx.createMediaStreamSource(new MediaStream([tabAudio[0]]));
       const recGain = ctx.createGain(); recGain.gain.value = 1.0;
-      tabNode.connect(recGain).connect(recDest);                 // BRANCH A — record
-      const monitorGain = ctx.createGain(); monitorGain.gain.value = 1.0;
-      tabNode.connect(monitorGain).connect(ctx.destination);     // BRANCH B — single monitor path
+      tabNode.connect(recGain).connect(recDest);                 // BRANCH A — record (WebAudio mix)
+      // BRANCH B — MONITOR through an <audio> element instead of ctx.destination:
+      // the element has its own deeply-buffered playout path, so device-output
+      // underruns on this throttled hidden page no longer crackle what the user
+      // hears, and the recording graph no longer contends with device output.
+      monitorEl = new Audio();
+      monitorEl.srcObject = new MediaStream([tabAudio[0]]);
+      monitorEl.play().catch((e) => log('monitor play failed: ' + e.message));
       tabLevel = levelChecker(tabNode);
       // NOTE: captured tab tracks fire mute/unmute on every natural pause in speech —
       // that is NOT an error (v5.8.3 fix: these used to raise false "no audio" warnings).
@@ -282,6 +286,7 @@ function teardownGraph() {
   if (levelTimer) { clearInterval(levelTimer); levelTimer = null; }
   if (samplerTimer) { clearInterval(samplerTimer); samplerTimer = null; }
   if (persistTimer) { clearInterval(persistTimer); persistTimer = null; }
+  if (monitorEl) { try { monitorEl.pause(); monitorEl.srcObject = null; } catch (e) { /* */ } monitorEl = null; }
   if (tabStream) tabStream.getTracks().forEach((t) => { t.onended = null; t.stop(); });
   if (micStream) micStream.getTracks().forEach((t) => t.stop());
   if (ctx) { try { ctx.onstatechange = null; ctx.close(); } catch (e) { /* ignore */ } }
