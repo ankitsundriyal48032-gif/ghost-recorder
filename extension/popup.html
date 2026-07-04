@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Ghost Recorder</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            width: 330px; margin: 0; padding: 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(160deg, #0b1220 0%, #111a2e 100%);
+            color: #e2e8f0;
+        }
+        .head { display: flex; align-items: center; gap: 10px; padding: 16px 18px 12px; }
+        .logo { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, #38bdf8, #6366f1);
+            display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        .head h1 { font-size: 1.05rem; margin: 0; letter-spacing: .2px; }
+        .head .sub { font-size: .7rem; color: #64748b; margin-top: 1px; }
+        .body { padding: 0 18px 16px; display: flex; flex-direction: column; gap: 10px; }
+        .card { background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.07); border-radius: 12px; padding: 11px 14px; }
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; }
+        .toggle-row label { font-size: .85rem; color: #cbd5e1; }
+        .switch { position: relative; width: 42px; height: 23px; flex: none; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; inset: 0; background: #334155; border-radius: 23px; cursor: pointer; transition: .25s; }
+        .slider:before { content: ""; position: absolute; height: 17px; width: 17px; left: 3px; bottom: 3px;
+            background: #fff; border-radius: 50%; transition: .25s; }
+        input:checked + .slider { background: #2563eb; }
+        input:checked + .slider:before { transform: translateX(19px); }
+        .btn { padding: 13px; border: none; border-radius: 10px; font-weight: 700; font-size: .95rem; cursor: pointer; transition: .2s; width: 100%; }
+        .btn-start { background: linear-gradient(135deg, #2563eb, #4f46e5); color: #fff; }
+        .btn-start:hover { filter: brightness(1.12); box-shadow: 0 4px 18px rgba(59,99,235,.35); }
+        .btn-start:disabled { opacity: .45; cursor: default; box-shadow: none; }
+        .btn-stop { background: #dc2626; color: #fff; display: none; }
+        .btn-stop:hover { background: #b91c1c; }
+        .status { font-size: .8rem; color: #94a3b8; text-align: center; line-height: 1.45; }
+        .status a { color: #38bdf8; text-decoration: none; }
+        #tabInfo { font-size: .74rem; color: #7c93b5; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .timer { font-size: 1.9rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #38bdf8; display: none; text-align: center; margin: 2px 0; }
+        .links { display: flex; border-top: 1px solid rgba(255,255,255,.07); }
+        .links a { flex: 1; text-align: center; padding: 11px 0; font-size: .8rem; color: #94a3b8; text-decoration: none; font-weight: 600; }
+        .links a:hover { color: #38bdf8; background: rgba(255,255,255,.03); }
+        .links a + a { border-left: 1px solid rgba(255,255,255,.07); }
+        .pulse { display: inline-block; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; margin-right: 6px; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239,68,68,.6);} 70% { box-shadow: 0 0 0 8px rgba(239,68,68,0);} 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0);} }
+    </style>
+</head>
+<body>
+    <div class="head">
+        <div class="logo">👻</div>
+        <div>
+            <h1>Ghost Recorder</h1>
+            <div class="sub">AI meeting notes — any platform</div>
+        </div>
+    </div>
+    <div class="body">
+        <div class="card toggle-row">
+            <label>Record video</label>
+            <label class="switch">
+                <input type="checkbox" id="videoToggle" checked>
+                <span class="slider"></span>
+            </label>
+        </div>
+        <div id="timer" class="timer">00:00</div>
+        <div id="tabInfo"></div>
+        <button id="startBtn" class="btn btn-start">● Start Recording</button>
+        <div id="recRow" style="display:none;gap:8px">
+            <button id="pauseBtn" class="btn" style="flex:1;background:#334155;color:#fff">⏸ Pause</button>
+            <button id="stopBtn" class="btn btn-stop" style="flex:2;display:block">■ Stop</button>
+        </div>
+        <div id="statusText" class="status">Ready to capture this meeting</div>
+        <div id="micStatus" class="status"></div>
+    </div>
+    <div class="links">
+        <a id="dashLink" href="#">📋 Meetings</a>
+        <a id="settingsLink" href="#">⚙ Settings</a>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>

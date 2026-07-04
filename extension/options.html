@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Ghost Recorder — Settings</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: linear-gradient(160deg, #0b1220 0%, #101a2e 100%); color: #e2e8f0; margin: 0; padding: 36px 40px; min-height: 100vh; }
+    .wrap { max-width: 600px; margin: 0 auto; }
+    .head { display: flex; align-items: center; gap: 12px; }
+    .logo { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #38bdf8, #6366f1); display: flex; align-items: center; justify-content: center; font-size: 20px; flex: none; }
+    h1 { color: #e2e8f0; font-size: 1.35rem; margin: 0; }
+    a.mtg { margin-left: auto; color: #38bdf8; text-decoration: none; font-weight: 600; background: rgba(56,189,248,.1); padding: 8px 14px; border-radius: 9px; }
+    a.mtg:hover { background: rgba(56,189,248,.18); }
+    .sub { color: #64748b; margin: 8px 0 24px; font-size: .88rem; }
+    .field { margin-bottom: 20px; }
+    label { display: block; font-size: .85rem; color: #94a3b8; margin-bottom: 7px; font-weight: 600; }
+    input[type=text], input[type=password], input[type=email], select {
+      width: 100%; box-sizing: border-box; padding: 11px 13px; border-radius: 9px; background: #1e293b; border: 1px solid #334155; color: #e2e8f0; font-size: .95rem; }
+    input:focus, select:focus { outline: none; border-color: #38bdf8; }
+    .hint { font-size: .76rem; color: #64748b; margin-top: 6px; }
+    .hint a { color: #38bdf8; }
+    .row { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: #1e293b; border-radius: 9px; }
+    .switch { position: relative; width: 46px; height: 26px; flex: none; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; inset: 0; background: #334155; border-radius: 26px; cursor: pointer; transition: .3s; }
+    .slider:before { content: ""; position: absolute; height: 20px; width: 20px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: .3s; }
+    input:checked + .slider { background: #2563eb; }
+    input:checked + .slider:before { transform: translateX(20px); }
+    .btn { background: #2563eb; color: #fff; border: 0; padding: 12px 22px; border-radius: 9px; font-weight: 700; font-size: .95rem; cursor: pointer; }
+    .btn:hover { background: #1d4ed8; } .btn.ghost { background: #334155; }
+    #saved, #micMsg { font-size: .85rem; margin-left: 12px; }
+    #saved { color: #34d399; opacity: 0; transition: opacity .2s; } #saved.show { opacity: 1; }
+    .card { background: #111827; border: 1px solid #233148; border-radius: 12px; padding: 18px 20px; margin-bottom: 22px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="head">
+      <div class="logo">👻</div>
+      <h1>Ghost Recorder — Settings</h1>
+      <a class="mtg" href="dashboard.html" target="_blank">📋 Meetings</a>
+    </div>
+    <p class="sub">One-click meeting recorder for any platform. Bring your own AI key — nothing is sent to us.</p>
+
+    <div class="card">
+      <div class="field">
+        <label for="provider">AI provider</label>
+        <select id="provider">
+          <option value="gemini">Google Gemini (audio → notes, recommended)</option>
+          <option value="groq">Groq (Whisper + Llama, fast & cheap)</option>
+          <option value="openrouter">OpenRouter (any model)</option>
+          <option value="custom">Custom (OpenAI-compatible)</option>
+        </select>
+      </div>
+      <div class="field" id="baseUrlField">
+        <label for="baseUrl">Base URL (OpenAI-compatible)</label>
+        <input type="text" id="baseUrl" placeholder="https://your-endpoint/v1">
+      </div>
+      <div class="field">
+        <label for="apiKey">API key <span style="color:#fbbf24">(required for AI notes)</span></label>
+        <div style="display:flex;gap:8px">
+          <input type="password" id="apiKey" placeholder="Paste your key" autocomplete="off" style="flex:1">
+          <button class="btn ghost" id="revealBtn" type="button" title="Show/hide" style="padding:11px 14px">👁</button>
+          <button class="btn ghost" id="testBtn" type="button" style="padding:11px 16px">Test</button>
+        </div>
+        <div class="hint" id="keyHint"></div>
+        <div class="hint" id="testResult"></div>
+        <div class="hint" id="configuredHint"></div>
+      </div>
+      <div class="field">
+        <label for="model">Model</label>
+        <input type="text" id="model" placeholder="model id">
+        <div class="hint" id="modelHint"></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="template">Note style</label>
+      <select id="template"></select>
+      <div class="hint">Pick the template that matches your meetings. You can change it and re-run on any past meeting.</div>
+    </div>
+
+    <div class="field">
+      <label>Microphone — records YOUR voice (remote audio is captured automatically)</label>
+      <div class="row">
+        <span style="font-size:.9rem;color:#cbd5e1">Grant mic access once so your side is recorded</span>
+        <button class="btn ghost" id="micBtn">🎤 Enable mic</button>
+      </div>
+      <div class="hint" id="micMsgWrap"><span id="micMsg"></span></div>
+    </div>
+
+    <div class="field">
+      <label>Record video</label>
+      <div class="row"><span style="font-size:.9rem;color:#cbd5e1">Off = audio only (lighter)</span>
+        <label class="switch"><input type="checkbox" id="videoEnabled"><span class="slider"></span></label></div>
+    </div>
+    <div class="field">
+      <label>Auto-suggest recording when a meeting is detected</label>
+      <div class="row"><span style="font-size:.9rem;color:#cbd5e1">Show a "Record this meeting?" prompt</span>
+        <label class="switch"><input type="checkbox" id="autoSuggest"><span class="slider"></span></label></div>
+    </div>
+
+    <div class="field">
+      <label>Add a consent / recording note to the notes</label>
+      <div class="row"><span style="font-size:.9rem;color:#cbd5e1">Append "recorded with an AI notetaker" to saved/emailed notes</span>
+        <label class="switch"><input type="checkbox" id="consentNote"><span class="slider"></span></label></div>
+    </div>
+
+    <div class="field">
+      <label for="email">Email notes to</label>
+      <input type="email" id="email" placeholder="you@example.com">
+    </div>
+    <div class="field">
+      <label>Auto-open an email draft when notes are ready</label>
+      <div class="row"><span style="font-size:.9rem;color:#cbd5e1">Pop a pre-filled email after each meeting</span>
+        <label class="switch"><input type="checkbox" id="autoEmail"><span class="slider"></span></label></div>
+    </div>
+
+    <button class="btn" id="save">Save settings</button>
+    <span id="saved">✓ Saved</span>
+  </div>
+  <script src="templates.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "Ghost Recorder",
+  "version": "5.8",
+  "description": "One-click AI meeting recorder for ANY platform. Local recordings, transcripts with speakers & timestamps, summaries, action items, Ask-AI. Bring your own Gemini / Groq / OpenRouter key.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "activeTab",
+    "tabCapture",
+    "offscreen",
+    "storage",
+    "unlimitedStorage",
+    "notifications",
+    "scripting",
+    "tabs",
+    "downloads",
+    "downloads.shelf",
+    "downloads.ui",
+    "downloads.open"
+  ],
+  "host_permissions": [
+    "*://*/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://api.groq.com/*",
+    "https://openrouter.ai/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["*://*/*"],
+      "js": ["inject.js", "inject-webrtc.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["*://*/*"],
+      "js": ["content-script.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [{
+    "resources": ["mic-permission.html"],
+    "matches": ["*://*/*"]
+  }],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html", "default_icon": { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" } },
+  "options_page": "dashboard.html"
+}

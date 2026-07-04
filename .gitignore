@@ -1,0 +1,41 @@
+# ===== private — never commit =====
+extension.pem
+*.pem
+*.crx
+All recordings/
+.env
+
+# third-party code kept locally for research (not ours to redistribute)
+reference/meetily/
+bluedot_unpacked/
+mailtracker_unpacked/
+antigravity-awesome-skills-main/
+claude-skills-main/
+
+# legacy / local-only
+server/
+scratch/
+.agent/
+.claude/
+IMPLEMENTATION_PLAN.md
+reverse_engineering_notes.md
+
+# dependencies / build output
+node_modules/
+mobile/node_modules/
+mobile/.expo/
+mobile/android/
+mobile/ios/
+dist/
+*.zip
+
+# OS/editor junk
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
+
+# recordings
+*.webm
+*.m4a
