@@ -207,14 +207,24 @@ let live = null; // { rec, chunks, stream, recog, startMs, pausedAt, totalPaused
 
 const liveMMSS = () => { const s = Math.max(0, Math.floor((Date.now() - live.startMs - live.totalPaused) / 1000)); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
 
+// Live-transcript languages (Chrome's speech engine does ONE at a time; the final
+// AI transcript is language-agnostic regardless — Gemini/Whisper auto-detect).
+const LIVE_LANGS = [
+  ['auto', 'Auto (browser language)'], ['en-IN', 'English (India / Hinglish)'], ['en-US', 'English (US)'], ['en-GB', 'English (UK)'],
+  ['hi-IN', 'हिन्दी Hindi'], ['es-ES', 'Español'], ['fr-FR', 'Français'], ['de-DE', 'Deutsch'], ['pt-BR', 'Português'],
+  ['ar-SA', 'العربية Arabic'], ['id-ID', 'Bahasa Indonesia'], ['ja-JP', '日本語 Japanese'], ['ko-KR', '한국어 Korean'],
+  ['zh-CN', '中文 Chinese'], ['ru-RU', 'Русский Russian'], ['it-IT', 'Italiano'], ['nl-NL', 'Nederlands'], ['tr-TR', 'Türkçe'],
+];
+
 async function startOffline() {
   if (live) return;
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: { noiseSuppression: true, autoGainControl: true, echoCancellation: false } }); }
   catch (e) { alert('Microphone is blocked. Open ⚙ Settings and click "🎤 Enable mic" once, then try again.'); return; }
+  const { settings } = await chrome.storage.local.get('settings');
   const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
   const rec = new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: 64000 });
-  live = { rec, chunks: [], stream, recog: null, startMs: Date.now(), pausedAt: 0, totalPaused: 0, lines: [], timer: null };
+  live = { rec, chunks: [], stream, recog: null, startMs: Date.now(), pausedAt: 0, totalPaused: 0, lines: [], timer: null, lang: (settings && settings.liveLang) || 'auto' };
   rec.ondataavailable = (e) => { if (e.data && e.data.size) live.chunks.push(e.data); };
   rec.start(5000);
   startLiveRecog();
@@ -226,7 +236,8 @@ function startLiveRecog() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { live.noSR = true; return; }
   const r = new SR();
-  r.continuous = true; r.interimResults = true; r.lang = navigator.language || 'en-US';
+  r.continuous = true; r.interimResults = true;
+  r.lang = (live.lang && live.lang !== 'auto') ? live.lang : (navigator.language || 'en-US');
   r.onresult = (e) => {
     let interim = '';
     for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -257,6 +268,9 @@ function renderLive(detail) {
     <div class="actions">
       <button class="btn ghost" id="livePause">${live.pausedAt ? '▶ Resume' : '⏸ Pause'}</button>
       <button class="btn" id="liveStop" style="background:#dc2626">■ Stop &amp; get notes</button>
+      <select id="liveLang" title="Live transcript language (final AI notes auto-detect any language)" style="background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:.8rem">
+        ${LIVE_LANGS.map(([v, l]) => `<option value="${v}" ${v === live.lang ? 'selected' : ''}>${esc(l)}</option>`).join('')}
+      </select>
     </div>
     <div class="transcript" id="liveTr" style="min-height:200px;max-height:52vh;overflow-y:auto"><div class="tl plain">Listening…</div></div>`;
   updateLiveUI('');
@@ -268,6 +282,13 @@ function renderLive(detail) {
     render();
   };
   document.getElementById('liveStop').onclick = stopOffline;
+  document.getElementById('liveLang').onchange = (e) => {
+    live.lang = e.target.value;
+    chrome.storage.local.get('settings', ({ settings }) => chrome.storage.local.set({ settings: Object.assign({}, settings || {}, { liveLang: live.lang }) }));
+    if (live.recog) { const r = live.recog; live.recog = null; try { r.stop(); } catch (err) { /* */ } } // kill (no auto-restart while null)
+    live.noSR = false;
+    startLiveRecog(); // fresh engine in the new language; recording itself never stops
+  };
 }
 
 async function stopOffline() {
