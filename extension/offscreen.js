@@ -194,7 +194,11 @@ async function startRecording(streamId, videoEnabled, id) {
     log(`captured tracks — video:${tabStream.getVideoTracks().length} audio:${tabAudio.length}`);
     tabStream.getTracks().forEach((t) => { t.onended = onTabEnded; });
 
-    ctx = new AudioContext();
+    // 'playback' latency = larger render buffers. The offscreen page is hidden and
+    // CPU-throttled; with default 'interactive' buffers the graph underruns under
+    // continuous audio -> crackling ("chhid-chhid") in BOTH the monitor and the file
+    // (verified: 29 micro-gaps in a YouTube capture). Costs ~0.1s monitor delay.
+    ctx = new AudioContext({ latencyHint: 'playback', sampleRate: 48000 });
     if (ctx.state === 'suspended') await ctx.resume();
     // If the OS suspends the AudioContext when the window is minimized, resume it so recording doesn't drop out.
     ctx.onstatechange = () => { if (ctx && ctx.state === 'suspended' && !stopping) ctx.resume().catch(() => {}); };
