@@ -14,7 +14,7 @@ let audioRecorder = null, videoRecorder = null, audioChunks = [], videoChunks = 
 let meetingId = null, stopping = false, recStartMs = 0;
 let levelTimer = null, tabLevel = null, micLevel = null, tabHadAudio = false, micHadAudio = false, tabHadAudioTrack = false;
 let silenceWarned = false, levelTicks = 0, persistTimer = null, samplerTimer = null;
-let tabPeak = 0, micPeak = 0;
+let tabPeak = 0, micPeak = 0, tabPeakAll = 0, micPeakAll = 0;
 let pausedAt = 0, totalPausedMs = 0;
 
 function log(msg) { console.log('[offscreen]', msg); chrome.runtime.sendMessage({ action: 'LOG', message: msg }).catch(() => {}); }
@@ -181,7 +181,7 @@ function onTabEnded() {
 async function startRecording(streamId, videoEnabled, id) {
   meetingId = id; stopping = false; audioChunks = []; videoChunks = [];
   tabHadAudio = micHadAudio = tabHadAudioTrack = false; silenceWarned = false; levelTicks = 0;
-  tabPeak = 0; micPeak = 0;
+  tabPeak = 0; micPeak = 0; tabPeakAll = 0; micPeakAll = 0;
   recStartMs = Date.now(); pausedAt = 0; totalPausedMs = 0;
   log(`starting recording (video=${videoEnabled}, id=${id})`);
   try {
@@ -216,8 +216,8 @@ async function startRecording(streamId, videoEnabled, id) {
     // Level sampling every 300ms (a single 2s snapshot missed speech between checks
     // and caused false "silent" verdicts); peaks are evaluated by the 2s watchdog.
     samplerTimer = setInterval(() => {
-      if (tabLevel) tabPeak = Math.max(tabPeak, tabLevel());
-      if (micLevel) micPeak = Math.max(micPeak, micLevel());
+      if (tabLevel) { const v = tabLevel(); tabPeak = Math.max(tabPeak, v); tabPeakAll = Math.max(tabPeakAll, v); }
+      if (micLevel) { const v = micLevel(); micPeak = Math.max(micPeak, v); micPeakAll = Math.max(micPeakAll, v); }
     }, 300);
 
     // Watchdog every 2s: keep the AudioContext alive; warn LIVE only if the meeting
@@ -288,10 +288,12 @@ function teardownGraph() {
 
 function audioWarnings() {
   const w = [];
+  const db = (v) => (v > 0 ? Math.round(20 * Math.log10(v)) + ' dB' : 'silence');
   if (!tabHadAudioTrack) w.push('No meeting-audio track was captured — the remote side may be missing.');
-  else if (!tabHadAudio) w.push('The meeting (remote) audio seemed silent the whole time.');
-  if (!micConnected) w.push('Your microphone was not captured — only the remote side was recorded. Allow mic access to record your voice.');
-  else if (!micHadAudio) w.push('Your microphone seemed silent — check the right mic is selected.');
+  else if (!tabHadAudio) w.push('The meeting (remote) audio was silent the whole recording. (Normal if you were ALONE in the call — your own voice comes from the mic, not the meeting.)');
+  if (!micConnected) w.push('Your microphone was NOT captured — open Settings → "Enable mic", then record again.');
+  else if (!micHadAudio) w.push('Your microphone was connected but stayed silent — check Windows is using the right input device.');
+  w.push(`Audio diagnostics — meeting side peak: ${db(tabPeakAll)} · your mic peak: ${db(micPeakAll)} (speech is roughly -30 to -6 dB).`);
   return w;
 }
 
