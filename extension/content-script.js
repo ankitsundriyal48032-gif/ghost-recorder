@@ -133,10 +133,13 @@
       .time{color:#94a3b8;font-weight:600;font-size:12px;font-variant-numeric:tabular-nums;}
       .stop{margin-left:auto;background:#ef4444;color:#fff;border:0;border-radius:6px;padding:5px 10px;font-weight:700;cursor:pointer;font-size:12px;}
       .pause{background:#334155;color:#fff;border:0;border-radius:6px;padding:5px 10px;font-weight:700;cursor:pointer;font-size:12px;}
+      .min{background:transparent;color:#94a3b8;border:0;font-weight:700;cursor:pointer;font-size:14px;padding:2px 6px;}
+      .bubble{display:none;width:30px;height:30px;border-radius:50%;background:rgba(15,23,42,.85);border:2px solid #ef4444;align-items:center;justify-content:center;cursor:pointer;font-size:15px;box-shadow:0 4px 14px rgba(0,0,0,.4);animation:p 2s infinite;}
       .content{padding:12px 15px;max-height:200px;overflow-y:auto;font-size:13px;line-height:1.5;color:#cbd5e1;white-space:pre-wrap;}
       .hint{font-size:11px;color:#64748b;padding:0 15px 10px;}
       @keyframes p{0%{box-shadow:0 0 0 0 rgba(239,68,68,.7)}70%{box-shadow:0 0 0 6px rgba(239,68,68,0)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}}</style>
-      <div class="panel" id="panel"><div class="header" id="hdr"><div class="dot" id="dot"></div>Ghost AI Notes<span class="time" id="tm">00:00</span><button class="pause" id="pause">⏸</button><button class="stop" id="stop">Stop</button></div>
+      <div class="bubble" id="bubble" title="Ghost Recorder — recording. Click to expand.">👻</div>
+      <div class="panel" id="panel"><div class="header" id="hdr"><div class="dot" id="dot"></div>Ghost AI Notes<span class="time" id="tm">00:00</span><button class="pause" id="pause">⏸</button><button class="stop" id="stop">Stop</button><button class="min" id="min" title="Minimize — keeps the overlay out of the recording">—</button></div>
       <div class="content" id="t">Listening… AI transcribes the full audio — CC only adds speaker names.</div><div class="hint" id="aud"></div><div class="hint" id="mic"></div><div class="hint" id="h"></div></div>`;
     panel = shadow.getElementById('panel'); transcriptBox = shadow.getElementById('t');
     shadow.getElementById('stop').onclick = () => {
@@ -153,6 +156,18 @@
       else { startMs += Date.now() - pausedAtMs; startOverlayTimer(); }
       setHint(paused ? 'Paused — nothing is being recorded.' : '');
     };
+    // Minimize to a tiny dot — the overlay is part of the page, so it appears in
+    // the recorded video; minimized keeps recordings clean. State remembered.
+    const bubble = shadow.getElementById('bubble');
+    const setMin = (min) => {
+      panel.style.display = min ? 'none' : 'flex';
+      bubble.style.display = min ? 'flex' : 'none';
+      chrome.storage.local.set({ gr_overlay_min: min });
+    };
+    shadow.getElementById('min').onclick = () => setMin(true);
+    bubble.onclick = () => setMin(false);
+    chrome.storage.local.get('gr_overlay_min', ({ gr_overlay_min }) => { if (gr_overlay_min) setMin(true); });
+
     // Draggable: the overlay must never be stuck covering meeting controls.
     const hdr = shadow.getElementById('hdr');
     hdr.addEventListener('mousedown', (e) => {
@@ -234,11 +249,20 @@
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'SHOW_UI') {
-      startMs = Date.now(); createUI(); injectMicIframe(); if (panel) panel.style.display = 'flex'; startOverlayTimer(); startCaptionScraper();
+      startMs = Date.now(); createUI(); injectMicIframe(); startOverlayTimer(); startCaptionScraper();
+      chrome.storage.local.get('gr_overlay_min', ({ gr_overlay_min }) => {
+        if (!shadow) return;
+        const b = shadow.getElementById('bubble');
+        if (gr_overlay_min && b) { b.style.display = 'flex'; if (panel) panel.style.display = 'none'; }
+        else if (panel) panel.style.display = 'flex';
+      });
       const sg = document.getElementById('ghost-suggest'); if (sg) sg.remove();
       sendResponse({ success: true });
     } else if (request.action === 'HIDE_UI') {
-      stopCaptionScraper(); stopOverlayTimer(); if (panel) panel.style.display = 'none'; sendResponse({ success: true });
+      stopCaptionScraper(); stopOverlayTimer();
+      if (panel) panel.style.display = 'none';
+      if (shadow) { const b = shadow.getElementById('bubble'); if (b) b.style.display = 'none'; }
+      sendResponse({ success: true });
     } else if (request.action === 'MIC_STATUS') {
       if (shadow) { const m = shadow.getElementById('mic'); if (m) { m.textContent = request.connected ? '🎤 Your voice: recording' : '⚠ Your voice NOT captured — Enable mic in Settings'; m.style.color = request.connected ? '#34d399' : '#fca5a5'; } }
     } else if (request.action === 'AUDIO_STATUS') {
