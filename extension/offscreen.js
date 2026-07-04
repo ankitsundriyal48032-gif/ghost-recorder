@@ -13,7 +13,8 @@ let ctx = null, tabStream = null, micStream = null, recDest = null, micConnected
 let audioRecorder = null, videoRecorder = null, audioChunks = [], videoChunks = [];
 let meetingId = null, stopping = false, recStartMs = 0;
 let levelTimer = null, tabLevel = null, micLevel = null, tabHadAudio = false, micHadAudio = false, tabHadAudioTrack = false;
-let silenceWarned = false, levelTicks = 0, persistTimer = null;
+let silenceWarned = false, levelTicks = 0, persistTimer = null, samplerTimer = null;
+let tabPeak = 0, micPeak = 0;
 let pausedAt = 0, totalPausedMs = 0;
 
 function log(msg) { console.log('[offscreen]', msg); chrome.runtime.sendMessage({ action: 'LOG', message: msg }).catch(() => {}); }
@@ -180,6 +181,7 @@ function onTabEnded() {
 async function startRecording(streamId, videoEnabled, id) {
   meetingId = id; stopping = false; audioChunks = []; videoChunks = [];
   tabHadAudio = micHadAudio = tabHadAudioTrack = false; silenceWarned = false; levelTicks = 0;
+  tabPeak = 0; micPeak = 0;
   recStartMs = Date.now(); pausedAt = 0; totalPausedMs = 0;
   log(`starting recording (video=${videoEnabled}, id=${id})`);
   try {
@@ -205,20 +207,29 @@ async function startRecording(streamId, videoEnabled, id) {
       const monitorGain = ctx.createGain(); monitorGain.gain.value = 1.0;
       tabNode.connect(monitorGain).connect(ctx.destination);     // BRANCH B — single monitor path
       tabLevel = levelChecker(tabNode);
-      // A muted captured tab records pure silence — surface it live instead of at the end.
-      tabAudio[0].onmute = () => { if (!stopping) sendAudioStatus(false, 'Meeting audio went silent — is the tab muted?'); };
-      tabAudio[0].onunmute = () => { if (!stopping) sendAudioStatus(true, ''); };
+      // NOTE: captured tab tracks fire mute/unmute on every natural pause in speech —
+      // that is NOT an error (v5.8.3 fix: these used to raise false "no audio" warnings).
+      tabAudio[0].onmute = () => log('tab audio track muted (natural silence — normal)');
+      tabAudio[0].onunmute = () => log('tab audio track unmuted');
     } else { log('WARNING: no tab audio track'); }
 
-    // Silence watchdog every 2s: keep the AudioContext alive, mark which sides produced
-    // audio, and warn the user LIVE (overlay) if the meeting side stays silent ~14s.
+    // Level sampling every 300ms (a single 2s snapshot missed speech between checks
+    // and caused false "silent" verdicts); peaks are evaluated by the 2s watchdog.
+    samplerTimer = setInterval(() => {
+      if (tabLevel) tabPeak = Math.max(tabPeak, tabLevel());
+      if (micLevel) micPeak = Math.max(micPeak, micLevel());
+    }, 300);
+
+    // Watchdog every 2s: keep the AudioContext alive; warn LIVE only if the meeting
+    // side has produced NO audio at all for ~14s, and clear the moment audio appears.
     levelTimer = setInterval(() => {
       if (ctx && ctx.state !== 'running' && !stopping) ctx.resume().catch(() => {});
       levelTicks++;
-      if (tabLevel && tabLevel() > 0.012) tabHadAudio = true;
-      if (micLevel && micLevel() > 0.012) micHadAudio = true;
+      if (tabPeak > 0.008) { if (!tabHadAudio || silenceWarned) { silenceWarned = false; sendAudioStatus(true, ''); } tabHadAudio = true; }
+      if (micPeak > 0.008) micHadAudio = true;
+      if (levelTicks % 10 === 0) log(`audio levels — tabPeak=${tabPeak.toFixed(4)} micPeak=${micPeak.toFixed(4)} (threshold 0.008)`);
+      tabPeak = 0; micPeak = 0;
       if (!tabHadAudio && levelTicks === 7 && !silenceWarned) { silenceWarned = true; sendAudioStatus(false, 'No meeting audio detected yet — unmute the tab / check the call has sound.'); }
-      else if (tabHadAudio && silenceWarned) { silenceWarned = false; sendAudioStatus(true, ''); }
     }, 2000);
 
     const amime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
@@ -265,6 +276,7 @@ function saveBlob(id, kind, blob) {
 
 function teardownGraph() {
   if (levelTimer) { clearInterval(levelTimer); levelTimer = null; }
+  if (samplerTimer) { clearInterval(samplerTimer); samplerTimer = null; }
   if (persistTimer) { clearInterval(persistTimer); persistTimer = null; }
   if (tabStream) tabStream.getTracks().forEach((t) => { t.onended = null; t.stop(); });
   if (micStream) micStream.getTracks().forEach((t) => t.stop());
