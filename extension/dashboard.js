@@ -399,12 +399,13 @@ function renderSummary(m, tabc) {
 
 function renderTranscriptTab(m, tabc) {
   const { transcript } = splitNotes(m.notes);
-  if (!transcript) { tabc.innerHTML = '<p class="muted">No transcript yet' + (m.state === 'processing' ? ' — AI is still working.' : '.') + '</p>'; return; }
+  if (!transcript) { tabc.innerHTML = '<p class="muted">No transcript yet' + (m.state === 'processing' ? ' — AI is still working.' : '.') + '</p><div id="regen"></div>'; return; }
   tabc.innerHTML = `
     <div class="actions">
       <button class="btn ghost" id="copyTr">📄 Copy transcript</button>
       <span class="muted" style="align-self:center;font-size:.75rem">Click any line to jump the player</span>
     </div>
+    <div id="regen"></div>
     <div class="transcript tall" id="transcript">${renderTranscript(transcript)}</div>`;
   document.getElementById('copyTr').onclick = () => { navigator.clipboard.writeText(transcript).then(() => { const b = document.getElementById('copyTr'); b.textContent = '✓ Copied'; setTimeout(() => { b.textContent = '📄 Copy transcript'; }, 1600); }); };
 }

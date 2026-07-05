@@ -77,6 +77,196 @@
 ## Follow-ups for Next Time
 - {{item}}`,
     },
+    customer_discovery: {
+      label: 'Customer discovery / user interview',
+      skeleton: `# Discovery Interview — {{person / company}}
+**Date:** {{date}}  ·  **Interviewee:** {{name, role}}  ·  **Interviewer:** {{name}}
+
+## Their World (context)
+{{2-3 sentences on who they are and their situation}}
+
+## Problems & Pain Points
+- {{pain}} — {{severity/frequency if stated}}
+
+## Current Solution / Workarounds
+- {{how they solve it today}}
+
+## Memorable Quotes
+> {{verbatim quote}}
+
+## Feature Requests / Reactions
+- {{request or reaction to what was shown}}
+
+## Willingness to Pay / Buying Signals
+- {{signal or "not discussed"}}
+
+## Action Items
+- [ ] {{owner}} — {{task}} {{(due: date)}}`,
+    },
+    job_interview: {
+      label: 'Job interview / screening',
+      skeleton: `# Interview — {{candidate}} for {{role}}
+**Date:** {{date}}  ·  **Interviewers:** {{names}}  ·  **Stage:** {{screen | technical | final | unknown}}
+
+## Candidate Snapshot
+{{2-3 sentences: background, current role, headline strengths}}
+
+## Experience & Skills Discussed
+- {{skill/experience}} — {{evidence given}}
+
+## Strengths Observed
+- {{strength}}
+
+## Concerns / Gaps
+- {{concern}}
+
+## Candidate's Questions & Motivations
+- {{what they asked / what they want}}
+
+## Logistics
+- **Notice period / availability:** {{stated or "not discussed"}}
+- **Compensation expectations:** {{stated or "not discussed"}}
+
+## Action Items
+- [ ] {{owner}} — {{task}} {{(due: date)}}`,
+    },
+    team_meeting: {
+      label: 'Team meeting / project sync',
+      skeleton: `# Team Sync — {{team / project}}
+**Date:** {{date}}  ·  **Attendees:** {{names}}
+
+## TL;DR
+{{2-3 sentences}}
+
+## Status by Topic / Workstream
+### {{topic}}
+- {{update}} — {{on track | at risk | blocked}}
+
+## Risks & Blockers
+- {{risk/blocker}} — {{owner / needs}}
+
+## Decisions
+- {{decision}}
+
+## Action Items
+- [ ] {{owner}} — {{task}} {{(due: date)}}`,
+    },
+    brainstorm: {
+      label: 'Brainstorm / workshop',
+      skeleton: `# Brainstorm — {{topic}}
+**Date:** {{date}}  ·  **Participants:** {{names}}
+
+## Goal / Prompt
+{{what the group was trying to solve}}
+
+## Ideas Raised
+- **{{idea}}** — {{one-line description; who proposed it if clear}}
+
+## Standout Ideas (most discussed / best received)
+- {{idea}} — {{why it stood out}}
+
+## Concerns / Constraints Raised
+- {{concern}}
+
+## Next Steps
+- [ ] {{owner}} — {{task}} {{(due: date)}}`,
+    },
+    lecture: {
+      label: 'Lecture / webinar / training',
+      skeleton: `# Notes — {{session title}}
+**Date:** {{date}}  ·  **Speaker:** {{name}}  ·  **Duration:** {{duration}}
+
+## One-Paragraph Summary
+{{what this session taught}}
+
+## Key Concepts
+### {{concept}}
+{{2-3 line explanation as taught}}
+
+## Examples / Case Studies Used
+- {{example}}
+
+## Practical Takeaways
+- {{something the listener can apply}}
+
+## Q&A Highlights
+- **Q:** {{question}} → **A:** {{answer}}
+
+## Resources Mentioned
+- {{book / link / tool}}`,
+    },
+    customer_success: {
+      label: 'Client check-in / customer success',
+      skeleton: `# Client Check-in — {{client}}
+**Date:** {{date}}  ·  **Attendees:** {{names + roles}}  ·  **Health:** {{green | yellow | red — judge from tone}}
+
+## Summary
+{{2-3 sentences}}
+
+## Wins Since Last Check-in
+- {{win}}
+
+## Issues / Complaints
+- {{issue}} — {{impact; how upset are they}}
+
+## Requests
+- {{feature/support request}}
+
+## Renewal / Expansion Signals
+- {{signal: growth, churn risk, upsell opening — or "none"}}
+
+## Commitments Made to the Client
+- [ ] {{owner}} — {{commitment}} {{(due: date)}}
+
+## Internal Follow-ups
+- [ ] {{owner}} — {{task}}`,
+    },
+    leadership: {
+      label: 'Leadership / board review',
+      skeleton: `# Leadership Review — {{meeting name}}
+**Date:** {{date}}  ·  **Attendees:** {{names + roles}}
+
+## Executive Summary
+{{3-4 sentences: state of the business/project as presented}}
+
+## Metrics & Results Reported
+- {{metric}}: {{value / trend}}
+
+## Strategic Discussion
+- {{topic}} — {{positions taken, by whom}}
+
+## Decisions
+- {{decision}} — {{decided by}}
+
+## Asks & Approvals
+- {{who asked for what}} → {{approved | denied | deferred}}
+
+## Action Items
+- [ ] {{owner}} — {{task}} {{(due: date)}}`,
+    },
+    retro: {
+      label: 'Sprint retrospective',
+      skeleton: `# Retro — {{team / sprint}}
+**Date:** {{date}}  ·  **Participants:** {{names}}
+
+## What Went Well
+- {{item}}
+
+## What Didn't Go Well
+- {{item}}
+
+## Root Causes Discussed
+- {{cause behind the biggest pain}}
+
+## Ideas / Experiments to Try
+- {{improvement}}
+
+## Action Items (committed changes)
+- [ ] {{owner}} — {{task}} {{(due: date)}}
+
+## Kudos
+- {{shout-out}}`,
+    },
   };
 
   function systemPrompt(id, meta, opts) {

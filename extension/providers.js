@@ -7,7 +7,7 @@
   const GEMINI_BASE = 'https://generativelanguage.googleapis.com';
   const GEMINI_INLINE_MAX = 14 * 1024 * 1024;
   const GROQ_STT_MAX = 24 * 1024 * 1024; // 25MB free-tier cap, keep margin
-  const GEMINI_FALLBACKS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash'];
+  const GEMINI_FALLBACKS = ['gemini-3.1-flash-lite', 'gemini-3.1-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-1.5-flash'];
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -83,7 +83,7 @@
   }
 
   // ---- Gemini native (audio -> templated notes in one call) ----
-  async function geminiGenerate(model, apiKey, parts) {
+  async function geminiGenerate(model, apiKey, contents) {
     // Notes INCLUDE the full transcript, so long meetings need a big output
     // budget — 8192 tokens cut transcripts off around the 20-minute mark.
     // Gemini 1.5 caps output at 8192; 2.x/3.x accept far more.
@@ -92,7 +92,7 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({
-        contents: [{ role: 'user', parts }],
+        contents,
         generationConfig: { temperature: 0.2, maxOutputTokens: outCap },
         safetySettings: [
           { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
@@ -147,7 +147,7 @@
   async function geminiRun(audioBlob, captions, settings, tmpl, meta) {
     const apiKey = (settings.keys && settings.keys.gemini || '').trim();
     if (!apiKey) throw new Error('No Gemini API key set — open Settings.');
-    const preferred = (settings.models && settings.models.gemini) || 'gemini-2.5-flash';
+    const preferred = (settings.models && settings.models.gemini) || 'gemini-3.1-flash-lite';
     const chain = [preferred].concat(GEMINI_FALLBACKS).filter((m, i, a) => a.indexOf(m) === i);
 
     const promptText = tmpl.systemPrompt(meta, { includeTranscript: true }) +
@@ -164,9 +164,26 @@
     for (const model of chain) {
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
-          const g = await geminiGenerate(model, apiKey, makeParts());
-          const warnings = g.truncated ? ['The AI hit its output limit, so the notes/transcript may stop before the end of the meeting. Press "Generate" again (regenerate) — or pick Gemini 2.5 Flash in Settings for long meetings.'] : [];
-          return { notes: g.text, model, provider: 'gemini', warnings };
+          const contents = [{ role: 'user', parts: makeParts() }];
+          let g = await geminiGenerate(model, apiKey, contents);
+          let full = g.text;
+          const warnings = [];
+          // Very long meetings can exceed even the 64k output budget in one go.
+          // Gemini's 1M input window lets us keep the SAME audio in context and
+          // ask it to continue exactly where it stopped — no transcript loss.
+          for (let round = 0; g.truncated && round < 6; round++) {
+            try {
+              contents.push({ role: 'model', parts: [{ text: g.text }] });
+              contents.push({ role: 'user', parts: [{ text: 'You ran out of output space. CONTINUE exactly where you stopped — no preamble, no repetition of anything already written, keep the same strict "[mm:ss] Speaker: text" format until the very end of the audio.' }] });
+              g = await geminiGenerate(model, apiKey, contents);
+              full += (full.endsWith('\n') || g.text.startsWith('\n') ? '' : '\n') + g.text;
+            } catch (contErr) {
+              warnings.push('The transcript continuation failed partway (' + contErr.message.slice(0, 120) + ') — the end of a very long meeting may be missing. Regenerate to try again.');
+              break;
+            }
+          }
+          if (g.truncated && !warnings.length) warnings.push('This meeting is extremely long and the transcript may still be incomplete at the end — regenerate to try again.');
+          return { notes: full, model, provider: 'gemini', warnings };
         } catch (err) {
           lastErr = err;
           const s = err.status;

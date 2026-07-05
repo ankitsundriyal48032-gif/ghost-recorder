@@ -2,7 +2,8 @@
 const DEFAULTS = {
   provider: 'gemini',
   keys: { gemini: '', groq: '', openrouter: '', custom: '' },
-  models: { gemini: 'gemini-2.5-flash', groq: 'llama-3.3-70b-versatile', openrouter: 'google/gemini-2.5-flash', custom: '' },
+  models: { gemini: 'gemini-3.1-flash-lite', groq: 'llama-3.3-70b-versatile', openrouter: 'google/gemini-2.5-flash', custom: '' },
+  modelHistory: { gemini: [], groq: [], openrouter: [], custom: [] },
   groqWhisper: 'whisper-large-v3-turbo',
   customBaseUrl: '',
   template: 'general',
@@ -14,13 +15,21 @@ const DEFAULTS = {
 };
 const PROVIDER_NAMES = { gemini: 'Gemini', groq: 'Groq', openrouter: 'OpenRouter', custom: 'Custom' };
 const PROVIDER_INFO = {
-  gemini: { key: 'Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a>', model: 'e.g. gemini-2.5-flash · gemini-2.5-pro' },
+  gemini: { key: 'Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a>', model: 'e.g. gemini-3.1-flash-lite (default — free & generous) · gemini-2.5-flash · gemini-2.5-pro' },
   groq: { key: 'Get a free key at <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a>', model: 'e.g. llama-3.3-70b-versatile · openai/gpt-oss-120b' },
   openrouter: { key: 'Get a key at <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a>', model: 'any OpenRouter id, e.g. google/gemini-2.5-flash · openai/gpt-4o-mini' },
   custom: { key: 'Your OpenAI-compatible endpoint key.', model: 'the model id your endpoint expects' },
 };
 const $ = (id) => document.getElementById(id);
 let state = JSON.parse(JSON.stringify(DEFAULTS));
+
+// Well-known model ids offered alongside whatever the user has used before.
+const MODEL_SUGGESTIONS = {
+  gemini: ['gemini-3.1-flash-lite', 'gemini-3.1-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro'],
+  groq: ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b', 'llama-3.1-8b-instant'],
+  openrouter: ['google/gemini-2.5-flash', 'google/gemini-3.1-flash-lite', 'openai/gpt-4o-mini'],
+  custom: [],
+};
 
 function applyProviderView() {
   const p = $('provider').value;
@@ -30,6 +39,13 @@ function applyProviderView() {
   $('apiKey').value = state.keys[p] || '';
   $('model').value = state.models[p] || DEFAULTS.models[p] || '';
   $('baseUrl').value = state.customBaseUrl || '';
+  // Model picker: previously-used models (remembered) first, then known ids.
+  const dl = $('modelList');
+  if (dl) {
+    const hist = (state.modelHistory && state.modelHistory[p]) || [];
+    const opts = hist.concat(MODEL_SUGGESTIONS[p].filter((x) => !hist.includes(x)));
+    dl.innerHTML = opts.map((x) => `<option value="${x}">`).join('');
+  }
 }
 
 function load() {
@@ -38,7 +54,11 @@ function load() {
   self.GhostTemplates.list.forEach((t) => { const o = document.createElement('option'); o.value = t.id; o.textContent = t.label; sel.appendChild(o); });
   chrome.storage.local.get('settings', ({ settings }) => {
     const s = settings || {};
-    state = Object.assign({}, DEFAULTS, s, { keys: Object.assign({}, DEFAULTS.keys, s.keys || {}), models: Object.assign({}, DEFAULTS.models, s.models || {}) });
+    state = Object.assign({}, DEFAULTS, s, {
+      keys: Object.assign({}, DEFAULTS.keys, s.keys || {}),
+      models: Object.assign({}, DEFAULTS.models, s.models || {}),
+      modelHistory: Object.assign({}, DEFAULTS.modelHistory, s.modelHistory || {}),
+    });
     $('provider').value = state.provider;
     $('template').value = state.template;
     $('email').value = state.email;
@@ -85,6 +105,10 @@ function save() {
   state.provider = p;
   state.keys[p] = $('apiKey').value.trim();
   state.models[p] = $('model').value.trim() || DEFAULTS.models[p];
+  // Remember every model the user has saved, so it's one click to reuse later.
+  if (!state.modelHistory) state.modelHistory = { gemini: [], groq: [], openrouter: [], custom: [] };
+  const mh = state.modelHistory[p] || (state.modelHistory[p] = []);
+  if (state.models[p] && !mh.includes(state.models[p])) { mh.unshift(state.models[p]); if (mh.length > 10) mh.pop(); }
   state.customBaseUrl = $('baseUrl').value.trim();
   state.template = $('template').value;
   state.email = $('email').value.trim();
