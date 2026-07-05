@@ -15,12 +15,10 @@
     "storage",
     "unlimitedStorage",
     "notifications",
-    "scripting",
     "tabs",
     "downloads",
     "downloads.shelf",
-    "downloads.ui",
-    "downloads.open"
+    "downloads.ui"
   ],
   "host_permissions": [
     "*://*/*",
