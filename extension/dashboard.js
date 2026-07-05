@@ -144,6 +144,7 @@ function render() {
 
   const m = meetings.find((x) => x.id === selectedId);
   const detail = document.getElementById('detail');
+  detail.classList.toggle('fixed', !live && !!m); // meeting view: only #tabc scrolls
   if (live) { renderLive(detail); return; }   // in-person recording owns the screen
   if (!m) { renderHome(detail); return; }
 
