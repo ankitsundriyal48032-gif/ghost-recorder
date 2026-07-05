@@ -6,6 +6,8 @@ A Chrome (MV3) extension that records the meeting **tab** (video + both-sides au
 
 ![status](https://img.shields.io/badge/status-beta-orange) ![license](https://img.shields.io/badge/license-MIT-blue) ![platform](https://img.shields.io/badge/Chrome-MV3-green)
 
+![Meeting summary with built-in player, tabs and AI notes](docs/images/summary.png)
+
 ## Why Ghost Recorder?
 
 | | Ghost Recorder | Bot notetakers (Fathom, Fireflies) | Local apps (Meetily) |
@@ -27,6 +29,16 @@ A Chrome (MV3) extension that records the meeting **tab** (video + both-sides au
 - 🌐 **Universal meeting detection** — auto-suggests recording on Meet, Zoom, Teams, Webex, Jitsi, Discord, and any WebRTC site.
 - 📁 **Local files** — per-meeting folder in Downloads (`Ghost Recordings/2026-07-04 14-30 Google Meet/`) with video, audio, notes.md.
 - 🔐 **BYOK** — keys live in `chrome.storage.local`, sent only to the provider you chose. No account, no telemetry, no middleman server.
+
+## See it in action
+
+| | |
+|---|---|
+| **🖱 Click-to-seek transcript** — click any line, the player jumps there | ![Transcript tab: click any line to jump the player](docs/images/transcript-click-to-seek.png) |
+| **✨ Ask AI** — chat with one meeting or your whole history | ![Ask AI tab answering questions about the meeting](docs/images/ask-ai.png) |
+| **🏠 Home** — stats, in-person recorder, Ask across all meetings | ![Home view with stats and all-meetings Ask AI](docs/images/home.png) |
+| **⏺ One-click popup** — shows exactly which tab it will record | ![Popup over the settings page](docs/images/popup.png) |
+| **🔑 BYOK settings** — Gemini, Groq, OpenRouter or any OpenAI-compatible endpoint | ![Provider dropdown in settings](docs/images/settings-providers.png) |
 
 ## Install (unpacked, 2 minutes)
 1. Download/clone this repo.
