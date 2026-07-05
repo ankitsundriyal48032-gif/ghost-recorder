@@ -124,7 +124,7 @@ const UNRECORDABLE = /^(chrome|edge|about|devtools|view-source|chrome-extension|
 
 function notify(id, title, message) {
   try {
-    chrome.notifications.create('ghost-' + id, { type: 'basic', iconUrl: 'icon.png', title, message: (message || '').slice(0, 150), priority: 2 });
+    chrome.notifications.create('ghost-' + id, { type: 'basic', iconUrl: 'icons/icon128.png', title, message: (message || '').slice(0, 150), priority: 2 });
   } catch (e) { /* notifications unavailable */ }
 }
 if (chrome.notifications && chrome.notifications.onClicked) {
