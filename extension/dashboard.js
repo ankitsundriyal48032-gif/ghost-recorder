@@ -151,19 +151,21 @@ function render() {
   const metaLine = [localDate(m.date), m.duration && m.duration !== 'Unknown' ? m.duration : '', m.platform || '', m.model ? `notes by ${m.model}` : '']
     .filter(Boolean).join(' · ');
   detail.innerHTML = `
-    <h2 class="title">${esc(m.title || m.id)} ${badge(m.state)}
-      <button class="btn ghost mini" id="renameBtn" title="Rename">✎</button>
-      <button class="btn ghost mini" id="deleteBtn" title="Delete from this list">🗑</button></h2>
-    <div class="muted" style="margin:-4px 0 12px">${esc(metaLine)}</div>
-    <div class="pinned">
+    <div class="mv-left">
+      <h2 class="title">${esc(m.title || m.id)} ${badge(m.state)}
+        <button class="btn ghost mini" id="renameBtn" title="Rename">✎</button>
+        <button class="btn ghost mini" id="deleteBtn" title="Delete from this list">🗑</button></h2>
+      <div class="muted" style="margin:-4px 0 12px">${esc(metaLine)}</div>
       <div id="player"></div>
+    </div>
+    <div class="mv-right">
       <div class="tabs">
         <button class="tab ${currentTab === 'summary' ? 'on' : ''}" data-tab="summary">SUMMARY</button>
         <button class="tab ${currentTab === 'transcript' ? 'on' : ''}" data-tab="transcript">TRANSCRIPT</button>
         <button class="tab ${currentTab === 'ask' ? 'on' : ''}" data-tab="ask">✨ ASK AI</button>
       </div>
-    </div>
-    <div id="tabc"></div>`;
+      <div id="tabc" class="${currentTab === 'ask' ? 'askpane' : ''}"></div>
+    </div>`;
   detail.querySelectorAll('.tab').forEach((b) => b.onclick = () => { currentTab = b.dataset.tab; render(); });
   document.getElementById('renameBtn').onclick = () => {
     const t = prompt('Meeting name:', m.title || '');

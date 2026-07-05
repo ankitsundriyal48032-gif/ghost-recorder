@@ -43,13 +43,21 @@
     .btn:disabled { opacity: .5; cursor: default; }
     .btn.mini { padding: 3px 9px; font-size: .76rem; vertical-align: middle; }
     .btn.selbtn { background: var(--acc2); border-color: var(--acc2); }
-    .vid { width: 100%; max-height: 40vh; border-radius: 12px; background: #000; outline: none; }
-    /* Meeting view: the page never scrolls. Video + tab bar are fixed; ONLY the
-       tab content box (summary / transcript / chat) scrolls, inside itself. */
-    .detail.fixed { display: flex; flex-direction: column; overflow: hidden; }
-    .detail.fixed .pinned { flex: none; }
-    .pinned .tabs { margin-bottom: 0; }
-    .detail.fixed #tabc { flex: 1 1 0; min-height: 0; overflow-y: auto; padding: 16px 2px 8px; }
+    .vid { width: 100%; max-height: 62vh; border-radius: 12px; background: #000; outline: none; }
+    /* Meeting view = Fathom-style split: video column left (never moves), tabs
+       column right at FULL height — only the tab content scrolls, inside itself. */
+    .detail.fixed { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 26px; overflow: hidden; }
+    .mv-left { min-width: 0; min-height: 0; overflow-y: auto; }
+    .mv-right { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+    .mv-right .tabs { flex: none; margin-top: 0; }
+    .mv-right #tabc { flex: 1 1 0; min-height: 0; overflow-y: auto; padding: 2px 2px 8px; }
+    /* Ask tab: chat grows, input row stays pinned at the bottom of the pane. */
+    .mv-right #tabc.askpane { display: flex; flex-direction: column; overflow: hidden; }
+    .mv-right #tabc.askpane .chat { flex: 1 1 0; max-height: none; min-height: 0; }
+    @media (max-width: 1000px) {
+      .detail.fixed { display: block; overflow-y: auto; }
+      .vid { max-height: 40vh; }
+    }
     .speed { display: flex; align-items: center; gap: 6px; margin: 8px 0 2px; font-size: .78rem; color: var(--mut); }
     .spd.on { background: #2563eb; border-color: #2563eb; }
     .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 14px 0 16px; }
