@@ -18,6 +18,10 @@
     .topbar a:hover { color: var(--acc); background: rgba(56,189,248,.08); }
     .spacer { flex: 1; }
     .layout { display: grid; grid-template-columns: 290px 1fr; gap: 0; }
+    .layout.nolist { grid-template-columns: 1fr; }
+    .layout.nolist .list { display: none; }
+    .underv { margin-top: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 4px 16px 10px; }
+    .underv .uh { font-weight: 700; font-size: .85rem; color: var(--acc); margin: 10px 0 2px; letter-spacing: .4px; }
     .list { display: flex; flex-direction: column; gap: 8px; padding: 16px 14px; height: calc(100vh - 63px); overflow-y: auto; border-right: 1px solid var(--line); }
     .item { background: var(--panel); border: 1px solid var(--line); border-radius: 11px; padding: 12px 13px; cursor: pointer; transition: .12s; }
     .item:hover { background: var(--panel2); }
@@ -112,6 +116,7 @@
     <div class="logo" id="logoBtn" style="cursor:pointer" title="Home">👻</div>
     <div class="brand" id="brandBtn" style="cursor:pointer" title="Home">Ghost Recorder</div>
     <a href="#" id="homeBtn">🏠 Home</a>
+    <a href="#" id="listBtn" title="Hide/show the meeting list">◀ Hide list</a>
     <div class="search"><input id="search" placeholder="Search meetings, notes, transcripts…"></div>
     <div class="spacer"></div>
     <a href="options.html" target="_blank">⚙ Settings</a>

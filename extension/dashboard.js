@@ -157,6 +157,7 @@ function render() {
         <button class="btn ghost mini" id="deleteBtn" title="Delete from this list">🗑</button></h2>
       <div class="muted" style="margin:-4px 0 12px">${esc(metaLine)}</div>
       <div id="player"></div>
+      <div id="underv"></div>
     </div>
     <div class="mv-right">
       <div class="tabs">
@@ -180,6 +181,27 @@ function render() {
 
   renderTab(m);
   attachMedia(m);
+
+  // Under the video: action items pulled from the notes, always visible while
+  // you read the transcript or chat on the right.
+  const underv = document.getElementById('underv');
+  if (underv && m.notes) {
+    const act = sectionOf(splitNotes(m.notes).summary, /action|next step|to-?do/i);
+    if (act) underv.innerHTML = `<div class="underv"><div class="uh">📌 ACTION ITEMS</div><div class="notes">${renderMarkdown(act)}</div></div>`;
+  }
+}
+
+// Extract one "## <name>" section from notes markdown (until the next heading).
+function sectionOf(md, nameRe) {
+  if (!md) return '';
+  const out = [];
+  let inSec = false;
+  for (const ln of md.split('\n')) {
+    const h = ln.match(/^#{1,4}\s+(.*)/);
+    if (h) { inSec = nameRe.test(h[1]); continue; }
+    if (inSec) out.push(ln);
+  }
+  return out.join('\n').trim();
 }
 
 // Home view: quick stats + in-person recorder + Ask AI across ALL meetings.
@@ -498,6 +520,16 @@ document.addEventListener('DOMContentLoaded', () => {
   if (s) s.addEventListener('input', () => { searchQ = s.value.trim(); render(); });
   const goHome = (e) => { if (e) e.preventDefault(); selectedId = null; render(); };
   ['homeBtn', 'logoBtn', 'brandBtn'].forEach((id) => { const el = document.getElementById(id); if (el) el.onclick = goHome; });
+  // Foldable meeting list (state survives reloads).
+  const layout = document.querySelector('.layout');
+  const listBtn = document.getElementById('listBtn');
+  const applyList = () => {
+    const hid = localStorage.getItem('gr_list_hidden') === '1';
+    if (layout) layout.classList.toggle('nolist', hid);
+    if (listBtn) listBtn.textContent = hid ? '▶ Show list' : '◀ Hide list';
+  };
+  if (listBtn) listBtn.onclick = (e) => { e.preventDefault(); localStorage.setItem('gr_list_hidden', localStorage.getItem('gr_list_hidden') === '1' ? '0' : '1'); applyList(); };
+  applyList();
   load();
 });
 
