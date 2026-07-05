@@ -12,7 +12,14 @@ mailtracker_unpacked/
 antigravity-awesome-skills-main/
 claude-skills-main/
 
-# legacy / local-only
+# internal / local-only (product memory, operating model, launch kit — not for the public repo)
+product/
+operating-system/
+mobile/
+reference/
+docs/STORE-LISTING.md
+CLAUDE.md
+PRD.md
 server/
 scratch/
 .agent/

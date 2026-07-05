@@ -48,12 +48,8 @@ A Chrome (MV3) extension that records the meeting **tab** (video + both-sides au
 
 ## Repo map
 ```
-extension/          The Chrome extension (load this folder unpacked)
-mobile/             Ghost Notes — Android app scaffold (Expo/React Native, mic-based)
-product/            PRD, backlog, changelog, decisions — the product's memory
-docs/               Chrome Web Store listing kit
-operating-system/   Agent-first development operating model (how this was built)
-reference/          Competitive research notes (cloned repos are git-ignored)
+extension/   The Chrome extension — load this folder unpacked
+docs/        Screenshots used in this README
 ```
 
 ## Architecture (60 seconds)

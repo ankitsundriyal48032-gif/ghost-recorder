@@ -13,11 +13,6 @@ Thanks for helping! This is a plain-JS Chrome MV3 extension — no build step, n
 - Comments only for constraints the code can't express (Chrome quirks, audio-graph invariants).
 - Keep the recorder path (`offscreen.js` audio graph) conservative — a regression there silently ruins someone's meeting.
 
-## Where things live
-- `product/BACKLOG.md` — prioritized stories; `product/CHANGELOG.md` — every shipped change.
-- `docs/STORE-LISTING.md` — Chrome Web Store kit.
-- `mobile/` — the Android (Expo) app; `npm install && npx expo start`.
-
 ## High-value open items
 - Zoom/Teams live-caption DOM selectors (they change often; ours are best-effort).
 - VAD silence-trimming before AI upload (smaller/cheaper calls; fixes Groq 25MB cap on long meetings).
@@ -27,5 +22,4 @@ Thanks for helping! This is a plain-JS Chrome MV3 extension — no build step, n
 ## PR checklist
 - [ ] `node --check` passes on all touched JS
 - [ ] Tested at least one real recording end-to-end (record → notes → playback → click-to-seek)
-- [ ] CHANGELOG entry under an "Unreleased" heading
 - [ ] No new permissions without discussion in an issue first
