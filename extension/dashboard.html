@@ -43,7 +43,11 @@
     .btn:disabled { opacity: .5; cursor: default; }
     .btn.mini { padding: 3px 9px; font-size: .76rem; vertical-align: middle; }
     .btn.selbtn { background: var(--acc2); border-color: var(--acc2); }
-    .vid { width: 100%; max-height: 46vh; border-radius: 12px; background: #000; outline: none; }
+    .vid { width: 100%; max-height: 40vh; border-radius: 12px; background: #000; outline: none; }
+    /* Player + tab bar stay pinned while notes/transcript/chat scroll underneath. */
+    .pinned { position: sticky; top: 0; z-index: 4; background: var(--bg); padding-top: 6px; box-shadow: 0 10px 14px -12px rgba(0,0,0,.9); }
+    .pinned .tabs { margin-bottom: 0; }
+    #tabc { padding-top: 16px; }
     .speed { display: flex; align-items: center; gap: 6px; margin: 8px 0 2px; font-size: .78rem; color: var(--mut); }
     .spd.on { background: #2563eb; border-color: #2563eb; }
     .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 14px 0 16px; }

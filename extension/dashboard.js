@@ -154,11 +154,13 @@ function render() {
       <button class="btn ghost mini" id="renameBtn" title="Rename">✎</button>
       <button class="btn ghost mini" id="deleteBtn" title="Delete from this list">🗑</button></h2>
     <div class="muted" style="margin:-4px 0 12px">${esc(metaLine)}</div>
-    <div id="player"></div>
-    <div class="tabs">
-      <button class="tab ${currentTab === 'summary' ? 'on' : ''}" data-tab="summary">SUMMARY</button>
-      <button class="tab ${currentTab === 'transcript' ? 'on' : ''}" data-tab="transcript">TRANSCRIPT</button>
-      <button class="tab ${currentTab === 'ask' ? 'on' : ''}" data-tab="ask">✨ ASK AI</button>
+    <div class="pinned">
+      <div id="player"></div>
+      <div class="tabs">
+        <button class="tab ${currentTab === 'summary' ? 'on' : ''}" data-tab="summary">SUMMARY</button>
+        <button class="tab ${currentTab === 'transcript' ? 'on' : ''}" data-tab="transcript">TRANSCRIPT</button>
+        <button class="tab ${currentTab === 'ask' ? 'on' : ''}" data-tab="ask">✨ ASK AI</button>
+      </div>
     </div>
     <div id="tabc"></div>`;
   detail.querySelectorAll('.tab').forEach((b) => b.onclick = () => { currentTab = b.dataset.tab; render(); });
