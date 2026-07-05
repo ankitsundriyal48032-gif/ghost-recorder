@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Ghost Recorder",
   "version": "5.8.7",
-  "description": "One-click AI meeting recorder for ANY platform. Local recordings, transcripts with speakers & timestamps, summaries, action items, Ask-AI. Bring your own Gemini / Groq / OpenRouter key.",
+  "description": "One-click AI meeting notes on any platform. Local recording, speaker transcripts, summaries, action items. Bring your own AI key.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
