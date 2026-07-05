@@ -44,11 +44,11 @@
   }
 
   // ---- Shared OpenAI-compatible chat (Groq / OpenRouter / custom) ----
-  async function chatComplete(baseUrl, apiKey, model, messages, extraHeaders) {
+  async function chatComplete(baseUrl, apiKey, model, messages, extraHeaders, maxTokens) {
     const resp = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
       method: 'POST',
       headers: Object.assign({ 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` }, extraHeaders || {}),
-      body: JSON.stringify({ model, messages, temperature: 0.3, max_tokens: 4096 }),
+      body: JSON.stringify({ model, messages, temperature: 0.3, max_tokens: maxTokens || 8192 }),
     });
     if (!resp.ok) throw new Error(`Chat ${resp.status}: ${(await resp.text()).slice(0, 300)}`);
     const data = await resp.json();
@@ -84,12 +84,16 @@
 
   // ---- Gemini native (audio -> templated notes in one call) ----
   async function geminiGenerate(model, apiKey, parts) {
+    // Notes INCLUDE the full transcript, so long meetings need a big output
+    // budget — 8192 tokens cut transcripts off around the 20-minute mark.
+    // Gemini 1.5 caps output at 8192; 2.x/3.x accept far more.
+    const outCap = /gemini-1\.5/.test(model) ? 8192 : 65536;
     const resp = await fetch(`${GEMINI_BASE}/v1beta/models/${model}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({
         contents: [{ role: 'user', parts }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 8192 },
+        generationConfig: { temperature: 0.2, maxOutputTokens: outCap },
         safetySettings: [
           { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
           { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
@@ -112,7 +116,7 @@
       const reason = (data.promptFeedback && data.promptFeedback.blockReason) || (cand && cand.finishReason) || 'empty';
       throw new Error('Gemini returned no text (' + reason + ')');
     }
-    return text;
+    return { text, truncated: cand && cand.finishReason === 'MAX_TOKENS' };
   }
   async function geminiUploadFile(blob, mime, apiKey) {
     const start = await fetch(`${GEMINI_BASE}/upload/v1beta/files`, {
@@ -160,7 +164,9 @@
     for (const model of chain) {
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
-          return { notes: await geminiGenerate(model, apiKey, makeParts()), model, provider: 'gemini', warnings: [] };
+          const g = await geminiGenerate(model, apiKey, makeParts());
+          const warnings = g.truncated ? ['The AI hit its output limit, so the notes/transcript may stop before the end of the meeting. Press "Generate" again (regenerate) — or pick Gemini 2.5 Flash in Settings for long meetings.'] : [];
+          return { notes: g.text, model, provider: 'gemini', warnings };
         } catch (err) {
           lastErr = err;
           const s = err.status;
@@ -227,7 +233,7 @@
         notes = await chatComplete(baseUrl, apiKey, model, [
           { role: 'system', content: sysText(true) },
           { role: 'user', content: [{ type: 'text', text: 'Transcribe and produce the notes from this meeting audio.' + captionHint }, { type: 'input_audio', input_audio: { data: b64, format: 'wav' } }] },
-        ], extraHeaders);
+        ], extraHeaders, 32768); // response carries the full transcript — needs a big output budget
       } catch (e) {
         if (!captions) throw new Error('OpenRouter audio failed (' + e.message.slice(0, 200) + '). Pick an audio-capable model (e.g. google/gemini-2.5-flash) or turn on Meet CC.');
         warnings.push('OpenRouter audio model failed (' + e.message.slice(0, 120) + ').');

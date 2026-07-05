@@ -58,6 +58,10 @@ async function recoverInterrupted() {
       log('recovering interrupted recording ' + mid);
       // Register the meeting first (so the save lands in its folder), then save files.
       await new Promise((res) => chrome.runtime.sendMessage({ action: 'RECOVERED', meetingId: mid, hasVideo: !!rec.video }, () => res()));
+      // Snapshots were cut mid-flight and carry no Duration header — measure and
+      // stamp so recovered files are seekable and end where the media ends.
+      if (rec.audio) { const d = await measureDurationMs(rec.audio, 0); if (d > 0) rec.audio = await fixWebmDuration(rec.audio, d); }
+      if (rec.video) { const d = await measureDurationMs(rec.video, 0); if (d > 0) rec.video = await fixWebmDuration(rec.video, d); }
       if (rec.audio) saveBlob(mid, 'audio', rec.audio);
       if (rec.video) saveBlob(mid, 'video', rec.video);
       await idbPut({ id: mid, audio: rec.audio, video: rec.video || null, captions: rec.captions || '', settings: rec.settings || null, meta: rec.meta || {} });
@@ -109,6 +113,35 @@ function sendAudioStatus(ok, text) {
 // a timeline or seek — playback always restarts from 0. Patch the real duration
 // into the EBML header before saving. Best-effort: any parse failure returns the
 // original blob untouched.
+// Ask the browser for the media's REAL length: fresh MediaRecorder webm has no
+// Duration header, so metadata reports Infinity — seeking far past the end
+// forces Chrome to scan the clusters and report the true duration. Falls back
+// to the wall-clock estimate on any failure (never blocks saving).
+function measureDurationMs(blob, fallbackMs) {
+  return new Promise((resolve) => {
+    let el, url, timer;
+    const done = (ms) => {
+      clearTimeout(timer);
+      if (url) URL.revokeObjectURL(url);
+      if (el) { el.onerror = el.onloadedmetadata = el.ondurationchange = null; el.src = ''; el.remove(); }
+      resolve(ms);
+    };
+    try {
+      url = URL.createObjectURL(blob);
+      el = document.createElement('video');
+      el.preload = 'metadata'; el.muted = true;
+      timer = setTimeout(() => done(fallbackMs), 10000);
+      el.onerror = () => done(fallbackMs);
+      el.onloadedmetadata = () => {
+        if (isFinite(el.duration) && el.duration > 0) { done(el.duration * 1000); return; }
+        el.ondurationchange = () => { if (isFinite(el.duration) && el.duration > 0) done(el.duration * 1000); };
+        el.currentTime = 1e8; // force the cluster scan
+      };
+      el.src = url;
+    } catch (e) { done(fallbackMs); }
+  });
+}
+
 async function fixWebmDuration(blob, durationMs) {
   try {
     const buf = new Uint8Array(await blob.arrayBuffer());
@@ -335,8 +368,12 @@ async function stopRecording(opts) {
   audioChunks = []; videoChunks = [];
   const warnings = audioWarnings();
 
-  if (audioBlob) audioBlob = await fixWebmDuration(audioBlob, durationMs); // make files seekable
-  if (videoBlob) videoBlob = await fixWebmDuration(videoBlob, durationMs);
+  // Stamp each file with its OWN measured duration (decoded from the media
+  // timeline), not the wall clock — if the stamp is shorter than the real
+  // media, players stop early and pretend the recording ended. Wall clock is
+  // only the fallback when measuring fails.
+  if (audioBlob) audioBlob = await fixWebmDuration(audioBlob, await measureDurationMs(audioBlob, durationMs));
+  if (videoBlob) videoBlob = await fixWebmDuration(videoBlob, await measureDurationMs(videoBlob, durationMs));
   if (videoBlob) saveBlob(id, 'video', videoBlob);
   if (audioBlob) saveBlob(id, 'audio', audioBlob);
 
