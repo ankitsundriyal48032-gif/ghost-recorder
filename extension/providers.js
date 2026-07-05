@@ -144,6 +144,36 @@
     return [{ file_data: { mime_type: mime, file_uri: await geminiUploadFile(audioBlob, mime, apiKey) } }];
   }
 
+  // ---- transcript coverage helpers ----
+  // Long audio has TWO failure modes: (a) output-token cap (finishReason
+  // MAX_TOKENS) and (b) the model just STOPS transcribing early with a normal
+  // finish. (a) is detectable from the API; (b) only shows up as the last
+  // [mm:ss] falling short of the real recording length — so we check coverage.
+  function parseDurSec(s) {
+    if (!s || typeof s !== 'string') return 0;
+    const m = s.match(/(?:(\d+)\s*h)?\s*(?:(\d+)\s*m)?\s*(?:(\d+)\s*s)?/i);
+    return m ? (+(m[1] || 0)) * 3600 + (+(m[2] || 0)) * 60 + (+(m[3] || 0)) : 0;
+  }
+  function lastTsSec(text) {
+    const all = text.match(/\[(\d{1,2}):(\d{2})(?::(\d{2}))?\]/g);
+    if (!all || !all.length) return 0;
+    const m = all[all.length - 1].match(/\[(\d{1,2}):(\d{2})(?::(\d{2}))?\]/);
+    return m[3] !== undefined ? (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]) : (+m[1]) * 60 + (+m[2]);
+  }
+  const fmtTs = (sec) => {
+    sec = Math.max(0, Math.round(sec));
+    const h = Math.floor(sec / 3600), mn = Math.floor((sec % 3600) / 60), s = sec % 60;
+    return (h ? h + ':' + String(mn).padStart(2, '0') : mn) + ':' + String(s).padStart(2, '0');
+  };
+  async function audioDurationSec(blob, meta) {
+    const fromMeta = parseDurSec(meta && meta.duration);
+    if (fromMeta) return fromMeta;
+    try { // offscreen.js (same page) exposes measureDurationMs
+      if (typeof measureDurationMs === 'function') return (await measureDurationMs(blob, 0)) / 1000;
+    } catch (e) { /* best effort */ }
+    return 0;
+  }
+
   async function geminiRun(audioBlob, captions, settings, tmpl, meta) {
     const apiKey = (settings.keys && settings.keys.gemini || '').trim();
     if (!apiKey) throw new Error('No Gemini API key set — open Settings.');
@@ -164,25 +194,32 @@
     for (const model of chain) {
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
+          const durSec = await audioDurationSec(audioBlob, meta);
           const contents = [{ role: 'user', parts: makeParts() }];
           let g = await geminiGenerate(model, apiKey, contents);
           let full = g.text;
           const warnings = [];
-          // Very long meetings can exceed even the 64k output budget in one go.
-          // Gemini's 1M input window lets us keep the SAME audio in context and
-          // ask it to continue exactly where it stopped — no transcript loss.
-          for (let round = 0; g.truncated && round < 6; round++) {
+          // Keep the SAME audio in context (1M window) and force continuation
+          // until the transcript actually reaches the end of the recording —
+          // whether the model hit its output cap OR just stopped early.
+          const gapSec = () => (durSec > 240 ? (durSec - 100) - lastTsSec(full) : -1);
+          for (let round = 0; (g.truncated || gapSec() > 0) && round < 8; round++) {
+            const at = lastTsSec(full);
+            const ask = g.truncated
+              ? 'You ran out of output space. CONTINUE exactly where you stopped — no preamble, no repetition of anything already written, keep the same strict "[mm:ss] Speaker: text" format until the very end of the audio.'
+              : `Your transcript stops at [${fmtTs(at)}] but the recording is ${fmtTs(durSec)} long — you stopped too early. Listen to the REMAINING audio and CONTINUE the Full Transcript from [${fmtTs(at)}] all the way to the end. Same strict "[mm:ss] Speaker: text" format, timestamps must keep increasing past [${fmtTs(at)}]; do not repeat lines already written; no preamble, transcript lines only.`;
             try {
               contents.push({ role: 'model', parts: [{ text: g.text }] });
-              contents.push({ role: 'user', parts: [{ text: 'You ran out of output space. CONTINUE exactly where you stopped — no preamble, no repetition of anything already written, keep the same strict "[mm:ss] Speaker: text" format until the very end of the audio.' }] });
+              contents.push({ role: 'user', parts: [{ text: ask }] });
               g = await geminiGenerate(model, apiKey, contents);
               full += (full.endsWith('\n') || g.text.startsWith('\n') ? '' : '\n') + g.text;
+              if (!g.truncated && lastTsSec(full) <= at) break; // no forward progress — stop looping
             } catch (contErr) {
-              warnings.push('The transcript continuation failed partway (' + contErr.message.slice(0, 120) + ') — the end of a very long meeting may be missing. Regenerate to try again.');
+              warnings.push('Transcript continuation failed partway (' + contErr.message.slice(0, 120) + ') — the end of the meeting may be missing. Regenerate to try again.');
               break;
             }
           }
-          if (g.truncated && !warnings.length) warnings.push('This meeting is extremely long and the transcript may still be incomplete at the end — regenerate to try again.');
+          if (gapSec() > 0 && !warnings.length) warnings.push(`The transcript covers about ${fmtTs(lastTsSec(full))} of a ${fmtTs(durSec)} recording even after ${'auto-continuation'} — if the last part is missing, regenerate; if it keeps stopping at the same point, the audio itself may go silent there (check by playing the recording near ${fmtTs(lastTsSec(full))}).`);
           return { notes: full, model, provider: 'gemini', warnings };
         } catch (err) {
           lastErr = err;
