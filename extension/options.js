@@ -126,6 +126,42 @@ function save() {
 }
 $('save').addEventListener('click', save);
 
+// ---- meeting-history backup: move meetings between installs -----------------
+$('exportBtn').addEventListener('click', () => {
+  chrome.storage.local.get('meetings', ({ meetings }) => {
+    const payload = { app: 'ghost-recorder', kind: 'meeting-history', exported: new Date().toISOString(), meetings: meetings || [] };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 1)], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = 'ghost-recorder-meetings.json'; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    $('backupMsg').textContent = '✓ Exported ' + (meetings || []).length + ' meetings to your Downloads.';
+  });
+});
+$('importBtn').addEventListener('click', () => $('importFile').click());
+$('importFile').addEventListener('change', () => {
+  const f = $('importFile').files[0];
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      const data = JSON.parse(rd.result);
+      const incoming = Array.isArray(data) ? data : (data.meetings || []);
+      if (!incoming.length) { $('backupMsg').textContent = '✗ No meetings found in that file.'; return; }
+      chrome.storage.local.get('meetings', ({ meetings }) => {
+        const cur = meetings || [];
+        const have = new Set(cur.map((m) => m.id));
+        const added = incoming.filter((m) => m && m.id && !have.has(m.id));
+        const merged = cur.concat(added).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+        chrome.storage.local.set({ meetings: merged }, () => {
+          $('backupMsg').textContent = `✓ Imported ${added.length} new meetings (${incoming.length - added.length} were already here).`;
+        });
+      });
+    } catch (e) { $('backupMsg').textContent = '✗ Could not read that file: ' + e.message; }
+  };
+  rd.readAsText(f);
+  $('importFile').value = '';
+});
+
 $('micBtn').addEventListener('click', async () => {
   $('micMsg').textContent = 'Requesting…'; $('micMsg').style.color = '#94a3b8';
   try { const s = await navigator.mediaDevices.getUserMedia({ audio: true }); s.getTracks().forEach((t) => t.stop()); $('micMsg').textContent = '✓ Microphone enabled — your voice will be recorded.'; $('micMsg').style.color = '#34d399'; }

@@ -133,6 +133,19 @@
       </select>
     </div>
 
+    <div class="field">
+      <label>Meeting history backup</label>
+      <div class="row">
+        <span style="font-size:.9rem;color:#cbd5e1">Move your meetings + notes between installs (e.g. unpacked → Web Store version)</span>
+        <span>
+          <button class="btn ghost" id="exportBtn">⬇ Export</button>
+          <button class="btn ghost" id="importBtn">⬆ Import</button>
+          <input type="file" id="importFile" accept="application/json" style="display:none">
+        </span>
+      </div>
+      <div class="hint" id="backupMsg">Exports titles, dates, notes and transcripts as one JSON file. (Video/audio files are already in your Downloads folder and are not duplicated.)</div>
+    </div>
+
     <button class="btn" id="save">Save settings</button>
     <span id="saved">✓ Saved</span>
   </div>
