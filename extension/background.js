@@ -218,6 +218,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       chrome.runtime.sendMessage({ action: 'MIC_READY', target: 'offscreen' }).catch(() => {});
       return false;
 
+    case 'MEETING_MUTE': // content script saw the platform's mute button change -> mirror into the recording (only from the recorded tab)
+      if (recordingState.isRecording && sender.tab && sender.tab.id === recordingState.tabId) {
+        chrome.runtime.sendMessage({ action: 'MIC_MUTE', target: 'offscreen', data: { muted: !!request.muted, source: request.source || 'meeting' } }).catch(() => {});
+      }
+      return false;
+
     case 'MIC_STATUS': // from offscreen -> relay to the recording tab's overlay
       if (recordingState.tabId != null) chrome.tabs.sendMessage(recordingState.tabId, { action: 'MIC_STATUS', connected: request.connected }).catch(() => {});
       return false;

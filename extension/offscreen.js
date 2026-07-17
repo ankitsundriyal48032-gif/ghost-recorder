@@ -16,6 +16,8 @@ let levelTimer = null, tabLevel = null, micLevel = null, tabHadAudio = false, mi
 let silenceWarned = false, levelTicks = 0, persistTimer = null, samplerTimer = null;
 let tabPeak = 0, micPeak = 0, tabPeakAll = 0, micPeakAll = 0;
 let pausedAt = 0, totalPausedMs = 0;
+let monitorFailures = 0, monitorViaCtx = false;   // monitor resilience (issue: "other side went silent")
+let micGainNode = null, micMutedByUser = false;   // mic follows the meeting's mute state
 
 function log(msg) { console.log('[offscreen]', msg); chrome.runtime.sendMessage({ action: 'LOG', message: msg }).catch(() => {}); }
 
@@ -41,9 +43,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   else if (message.action === 'PAUSE_RECORDING') pauseRecording(true);
   else if (message.action === 'RESUME_RECORDING') pauseRecording(false);
   else if (message.action === 'MIC_READY') connectMic('mic-ready');
+  else if (message.action === 'MIC_MUTE') setMicMuted(!!(message.data && message.data.muted), (message.data && message.data.source) || 'user');
   else if (message.action === 'RETRY') retry(message.data || {});
   else if (message.action === 'RECOVER') recoverInterrupted();
 });
+
+// Mute/unmute the mic INSIDE the recording (gain to 0) — driven by the meeting
+// platform's own mute button (content script watches it) or a manual toggle.
+// If you're muted in the call, people can't hear you — the recording shouldn't either.
+function setMicMuted(muted, source) {
+  micMutedByUser = muted;
+  if (micGainNode) {
+    try { micGainNode.gain.value = muted ? 0 : 1; } catch (e) { /* */ }
+  }
+  log('mic ' + (muted ? 'MUTED' : 'unmuted') + ' in recording (' + source + ')');
+}
 
 // FAILSAFE: if Chrome/the extension died mid-recording, a 'live-<id>' snapshot is
 // still in IndexedDB. Turn it into a normal (recovered) meeting with saved files.
@@ -82,7 +96,8 @@ async function connectMic(why) {
     micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
     if (ctx.state === 'suspended') await ctx.resume();
     const micNode = ctx.createMediaStreamSource(micStream);
-    const micGain = ctx.createGain(); micGain.gain.value = 1.0;
+    const micGain = ctx.createGain(); micGain.gain.value = micMutedByUser ? 0 : 1; // honor mute state present before mic connected
+    micGainNode = micGain;
     micNode.connect(micGain).connect(recDest); // recorded only — never monitored (no feedback)
     micLevel = levelChecker(micNode);
     micConnected = true;
@@ -218,8 +233,13 @@ async function startRecording(streamId, videoEnabled, id) {
   recStartMs = Date.now(); pausedAt = 0; totalPausedMs = 0;
   log(`starting recording (video=${videoEnabled}, id=${id})`);
   try {
-    const constraints = { audio: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: streamId, googDisableLocalEcho: false } } };
-    if (videoEnabled) constraints.video = { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: streamId, maxWidth: 1280, maxHeight: 720, maxFrameRate: 15 } };
+    // googDisableLocalEcho:true = deterministic audio path. With :false Chrome
+    // MAY keep the tab playing AND we play our monitor copy ~100ms later — two
+    // overlapping playouts sound garbled ("disturbed") to the user. One path only.
+    const constraints = { audio: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: streamId, googDisableLocalEcho: true } } };
+    // 10fps / 1Mbps: meeting video is mostly-static slides+faces; lower encode
+    // load = no page lag while recording (VP8 encoding is the CPU hog here).
+    if (videoEnabled) constraints.video = { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: streamId, maxWidth: 1280, maxHeight: 720, maxFrameRate: 10 } };
     tabStream = await navigator.mediaDevices.getUserMedia(constraints);
 
     const tabAudio = tabStream.getAudioTracks();
@@ -236,6 +256,7 @@ async function startRecording(streamId, videoEnabled, id) {
     ctx.onstatechange = () => { if (ctx && ctx.state === 'suspended' && !stopping) ctx.resume().catch(() => {}); };
     recDest = ctx.createMediaStreamDestination();
 
+    let startMonitor = () => {};  // hoisted so the levelTimer watchdog can call it
     if (tabAudio.length) {
       const tabNode = ctx.createMediaStreamSource(new MediaStream([tabAudio[0]]));
       const recGain = ctx.createGain(); recGain.gain.value = 1.0;
@@ -246,7 +267,24 @@ async function startRecording(streamId, videoEnabled, id) {
       // hears, and the recording graph no longer contends with device output.
       monitorEl = new Audio();
       monitorEl.srcObject = new MediaStream([tabAudio[0]]);
-      monitorEl.play().catch((e) => log('monitor play failed: ' + e.message));
+      // The tab itself is muted by capture, so THIS element is the user's only
+      // way to hear the meeting. It must never silently fail: retry play() (the
+      // hidden page can hit autoplay rejection), and if it won't start within
+      // ~6s, fall back to WebAudio playout (ctx.destination) — audible always.
+      monitorFailures = 0; monitorViaCtx = false;
+      startMonitor = () => {
+        if (!monitorEl || stopping || monitorViaCtx) return;
+        monitorEl.play().then(() => { monitorFailures = 0; }).catch((e) => {
+          monitorFailures++;
+          log('monitor play failed (' + monitorFailures + '): ' + e.message);
+          if (monitorFailures >= 3) {
+            monitorViaCtx = true;
+            try { tabNode.connect(ctx.destination); log('monitor fallback: WebAudio playout engaged'); }
+            catch (e2) { log('monitor fallback failed: ' + e2.message); }
+          } else setTimeout(startMonitor, 2000);
+        });
+      };
+      startMonitor();
       tabLevel = levelChecker(tabNode);
       // NOTE: captured tab tracks fire mute/unmute on every natural pause in speech —
       // that is NOT an error (v5.8.3 fix: these used to raise false "no audio" warnings).
@@ -265,6 +303,10 @@ async function startRecording(streamId, videoEnabled, id) {
     // side has produced NO audio at all for ~14s, and clear the moment audio appears.
     levelTimer = setInterval(() => {
       if (ctx && ctx.state !== 'running' && !stopping) ctx.resume().catch(() => {});
+      // Monitor watchdog: the user must ALWAYS hear the call. If the element
+      // playout stalled (autoplay veto, device change) kick it; fallback engages
+      // via startMonitor's failure counter.
+      if (monitorEl && !monitorViaCtx && monitorEl.paused && !stopping) startMonitor();
       levelTicks++;
       if (tabPeak > 0.008) { if (!tabHadAudio || silenceWarned) { silenceWarned = false; sendAudioStatus(true, ''); } tabHadAudio = true; }
       if (micPeak > 0.008) micHadAudio = true;
@@ -326,6 +368,7 @@ function teardownGraph() {
   ctx = null; tabStream = null; micStream = null; recDest = null; tabLevel = null; micLevel = null;
   audioRecorder = null; videoRecorder = null;
   micConnected = false; // CRITICAL: without this, every recording after the first skips the mic (silent second run)
+  micGainNode = null; micMutedByUser = false; monitorViaCtx = false; monitorFailures = 0;
 }
 
 function audioWarnings() {
@@ -334,6 +377,7 @@ function audioWarnings() {
   if (!tabHadAudioTrack) w.push('No meeting-audio track was captured — the remote side may be missing.');
   else if (!tabHadAudio) w.push('The meeting (remote) audio was silent the whole recording. (Normal if you were ALONE in the call — your own voice comes from the mic, not the meeting.)');
   if (!micConnected) w.push('Your microphone was NOT captured — open Settings → "Enable mic", then record again.');
+  else if (micMutedByUser) w.push('Your mic was muted (following the meeting mute) for at least part of this recording.');
   else if (!micHadAudio) w.push('Your microphone was connected but stayed silent — check Windows is using the right input device.');
   w.push(`Audio diagnostics — meeting side peak: ${db(tabPeakAll)} · your mic peak: ${db(micPeakAll)} (speech is roughly -30 to -6 dB).`);
   return w;

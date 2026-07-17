@@ -247,9 +247,48 @@
   }
   function stopCaptionScraper() { if (captionObserver) { captionObserver.disconnect(); captionObserver = null; } finalized.clear(); }
 
+  // ---- meeting-mute mirror -------------------------------------------------
+  // If you're muted IN the call, the recording should not carry your voice
+  // either. Poll the platform's own mute control (cheap, 1.5s) and report
+  // changes; the recorder zeroes the mic gain while muted.
+  let muteTimer = null, lastMuteState = null;
+  function platformMuted() {
+    try {
+      const h = location.hostname;
+      if (h.includes('meet.google.com')) {
+        const b = document.querySelector('[data-is-muted]');
+        if (b) return b.getAttribute('data-is-muted') === 'true';
+      }
+      if (h.includes('teams.microsoft.com') || h.includes('teams.live.com')) {
+        const b = document.querySelector('#microphone-button, [data-tid="toggle-mute"]');
+        if (b) { const al = (b.getAttribute('aria-label') || '') + (b.getAttribute('title') || ''); if (/unmute/i.test(al)) return true; if (/mute/i.test(al)) return false; }
+      }
+      if (h.includes('zoom.us')) {
+        const b = document.querySelector('button[aria-label*="udio"], .join-audio-container button');
+        if (b) { const al = b.getAttribute('aria-label') || ''; if (/unmute/i.test(al)) return true; if (/^mute/i.test(al)) return false; }
+      }
+      // Generic fallback: any control whose accessible name is exactly "Unmute…"
+      const g = document.querySelector('button[aria-label^="Unmute" i], button[aria-label^="Unmute microphone" i]');
+      if (g) return true;
+    } catch (e) { /* selector churn — stay silent */ }
+    return null; // unknown
+  }
+  function startMuteWatch() {
+    stopMuteWatch();
+    lastMuteState = null;
+    muteTimer = setInterval(() => {
+      const m = platformMuted();
+      if (m === null || m === lastMuteState) return;
+      lastMuteState = m;
+      chrome.runtime.sendMessage({ action: 'MEETING_MUTE', muted: m, source: 'meeting' }).catch(() => {});
+      if (shadow) { const mi = shadow.getElementById('mic'); if (mi && m) { mi.textContent = '🔇 Muted in meeting — your voice is NOT being recorded'; mi.style.color = '#fbbf24'; } else if (mi && !m) { mi.textContent = '🎤 Your voice: recording'; mi.style.color = '#34d399'; } }
+    }, 1500);
+  }
+  function stopMuteWatch() { if (muteTimer) { clearInterval(muteTimer); muteTimer = null; } }
+
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'SHOW_UI') {
-      startMs = Date.now(); createUI(); injectMicIframe(); startOverlayTimer(); startCaptionScraper();
+      startMs = Date.now(); createUI(); injectMicIframe(); startOverlayTimer(); startCaptionScraper(); startMuteWatch();
       chrome.storage.local.get('gr_overlay_min', ({ gr_overlay_min }) => {
         if (!shadow) return;
         const b = shadow.getElementById('bubble');
@@ -259,7 +298,7 @@
       const sg = document.getElementById('ghost-suggest'); if (sg) sg.remove();
       sendResponse({ success: true });
     } else if (request.action === 'HIDE_UI') {
-      stopCaptionScraper(); stopOverlayTimer();
+      stopCaptionScraper(); stopOverlayTimer(); stopMuteWatch();
       if (panel) panel.style.display = 'none';
       if (shadow) { const b = shadow.getElementById('bubble'); if (b) b.style.display = 'none'; }
       sendResponse({ success: true });
