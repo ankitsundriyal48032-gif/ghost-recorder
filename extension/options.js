@@ -6,8 +6,10 @@ const DEFAULTS = {
   modelHistory: { gemini: [], groq: [], openrouter: [], custom: [] },
   groqWhisper: 'whisper-large-v3-turbo',
   customBaseUrl: '',
+  saveFolder: 'Ghost Recordings',
   template: 'general',
   email: '',
+  emailVia: 'gmail',
   autoEmail: false,
   videoEnabled: true,
   autoSuggest: true,
@@ -62,6 +64,8 @@ function load() {
     $('provider').value = state.provider;
     $('template').value = state.template;
     $('email').value = state.email;
+    $('saveFolder').value = state.saveFolder || 'Ghost Recordings';
+    $('emailVia').value = state.emailVia || 'gmail';
     $('videoEnabled').checked = !!state.videoEnabled;
     $('autoSuggest').checked = state.autoSuggest !== false;
     $('autoEmail').checked = !!state.autoEmail;
@@ -112,6 +116,8 @@ function save() {
   state.customBaseUrl = $('baseUrl').value.trim();
   state.template = $('template').value;
   state.email = $('email').value.trim();
+  state.saveFolder = $('saveFolder').value.trim() || 'Ghost Recordings';
+  state.emailVia = $('emailVia').value;
   state.videoEnabled = $('videoEnabled').checked;
   state.autoSuggest = $('autoSuggest').checked;
   state.autoEmail = $('autoEmail').checked;

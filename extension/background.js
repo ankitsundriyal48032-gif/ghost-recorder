@@ -106,8 +106,12 @@ function folderName(date, platform) {
 async function saveFileFor(meetingId, name, url, done) {
   const m = await getMeeting(meetingId);
   const folder = (m && m.folder) || `meeting-${meetingId}`;
+  // User-configurable base folder (Settings). Chrome extensions can only write
+  // inside the browser's download directory — the folder here is relative to it.
+  const { settings } = await chrome.storage.local.get('settings');
+  const base = ((settings && settings.saveFolder) || 'Ghost Recordings').replace(/[:*?"<>|.]/g, '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '') || 'Ghost Recordings';
   suppressDownloadUI();
-  chrome.downloads.download({ url, filename: `Ghost Recordings/${folder}/${name}`, saveAs: false, conflictAction: 'overwrite' }, (downloadId) => {
+  chrome.downloads.download({ url, filename: `${base}/${folder}/${name}`, saveAs: false, conflictAction: 'overwrite' }, (downloadId) => {
     if (chrome.runtime.lastError) {
       // FAILSAFE: never fail silently — the copy in IndexedDB still exists.
       const msg = chrome.runtime.lastError.message;
@@ -141,7 +145,22 @@ function emailMailto(meeting, email) {
   else body += '\n\n(Full transcript + recording saved to your Downloads folder.)';
   return `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent('Meeting Notes — ' + (meeting.date ? meeting.date.slice(0, 10) : meeting.id))}&body=${encodeURIComponent(body)}`;
 }
-function openEmail(meeting, email) { if (email) chrome.tabs.create({ url: emailMailto(meeting, email) }).catch(() => {}); }
+// Gmail web compose works for anyone signed into Gmail in the browser; mailto
+// needs a configured desktop mail app (many users have none, draft never opens).
+function emailGmail(meeting, email) {
+  const notes = meeting.notes || '';
+  let body = notes.split(/##\s*Full Transcript/i)[0].trim() || notes.slice(0, 1500);
+  if (body.length > 1800) body = body.slice(0, 1800) + '\n\n…(full notes saved to Downloads)';
+  else body += '\n\n(Full transcript + recording saved to your Downloads folder.)';
+  const su = 'Meeting Notes — ' + (meeting.title || (meeting.date ? meeting.date.slice(0, 10) : meeting.id));
+  return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent(su)}&body=${encodeURIComponent(body)}`;
+}
+async function openEmail(meeting, email) {
+  if (!email) return;
+  const s = await getSettings();
+  const url = s.emailVia === 'mailto' ? emailMailto(meeting, email) : emailGmail(meeting, email);
+  chrome.tabs.create({ url }).catch(() => {});
+}
 
 function offscreenPing() {
   return new Promise((resolve) => {

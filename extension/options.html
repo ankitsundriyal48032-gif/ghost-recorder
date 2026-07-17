@@ -42,7 +42,7 @@
       <h1>Ghost Recorder — Settings</h1>
       <a class="mtg" href="dashboard.html" target="_blank">📋 Meetings</a>
     </div>
-    <p class="sub">One-click meeting recorder for any platform. Bring your own AI key — nothing is sent to us.</p>
+    <p class="sub">One-click meeting recorder for any platform. Bring your own AI key: nothing is sent to us.</p>
 
     <div class="card">
       <div class="field">
@@ -84,7 +84,7 @@
     </div>
 
     <div class="field">
-      <label>Microphone — records YOUR voice (remote audio is captured automatically)</label>
+      <label>Microphone (records YOUR voice; remote audio is captured automatically)</label>
       <div class="row">
         <span style="font-size:.9rem;color:#cbd5e1">Grant mic access once so your side is recorded</span>
         <button class="btn ghost" id="micBtn">🎤 Enable mic</button>
@@ -110,6 +110,12 @@
     </div>
 
     <div class="field">
+      <label for="saveFolder">Recordings folder (inside your Downloads)</label>
+      <input type="text" id="saveFolder" placeholder="Ghost Recordings">
+      <div class="hint">Meetings are saved as <b>Downloads/&lt;this folder&gt;/&lt;date platform&gt;/</b>. Chrome only lets extensions write inside the browser's download location. To move everything to another drive (D:, E:), change Chrome's download folder once at <b>chrome://settings/downloads</b> and Ghost Recorder follows automatically.</div>
+    </div>
+
+    <div class="field">
       <label for="email">Email notes to</label>
       <input type="email" id="email" placeholder="you@example.com">
     </div>
@@ -117,6 +123,14 @@
       <label>Auto-open an email draft when notes are ready</label>
       <div class="row"><span style="font-size:.9rem;color:#cbd5e1">Pop a pre-filled email after each meeting</span>
         <label class="switch"><input type="checkbox" id="autoEmail"><span class="slider"></span></label></div>
+      <div class="hint">The draft opens with your notes filled in; you just press Send. No password or mail-server setup needed.</div>
+    </div>
+    <div class="field">
+      <label for="emailVia">Email opens in</label>
+      <select id="emailVia">
+        <option value="gmail">Gmail (web, recommended)</option>
+        <option value="mailto">My computer's mail app (Outlook etc.)</option>
+      </select>
     </div>
 
     <button class="btn" id="save">Save settings</button>
