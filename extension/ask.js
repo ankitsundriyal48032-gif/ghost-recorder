@@ -4,7 +4,7 @@
 (function () {
   const DEF = {
     provider: 'gemini', keys: {}, customBaseUrl: '',
-    models: { gemini: 'gemini-2.5-flash', groq: 'llama-3.3-70b-versatile', openrouter: 'google/gemini-2.5-flash', custom: '' },
+    models: { gemini: 'gemini-3.1-flash-lite', groq: 'llama-3.3-70b-versatile', openrouter: 'google/gemini-2.5-flash', custom: '' },
   };
   function getSettings() {
     return new Promise((r) => chrome.storage.local.get('settings', ({ settings }) => {
@@ -15,9 +15,10 @@
 
   const SYS = `You are Ask Ghost — the AI assistant inside the Ghost Recorder meeting app.
 Answer the user's questions using ONLY the meeting context provided. Rules:
+- PRIMARY SOURCE IS THE TRANSCRIPT. The context may also contain pre-written summary/action-item sections — treat those as a colleague's rough draft, NOT as the answer. Re-derive your answer from what was actually SAID in the transcript; if the draft sections missed or garbled something, your answer should be better than them, never a copy of them.
 - Be concise and specific. Use markdown bullets/bold where it helps scanning.
 - Cite speaker names, and [mm:ss] timestamps when referring to a moment.
-- For action items use "- [ ] Owner — task".
+- For action items: verb-first, concrete, with owner and any stated deadline — "- [ ] Owner — do X (due: date) [mm:ss]". Include commitments people made in passing ("I'll send that over") that draft notes often miss. Never output vague items like "follow up" without saying on what.
 - If the context does not contain the answer, say plainly that it wasn't discussed — never invent facts.`;
 
   async function askGemini(s, question, history, context) {
@@ -29,7 +30,7 @@ Answer the user's questions using ONLY the meeting context provided. Rules:
     ];
     (history || []).forEach((h) => contents.push({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.text }] }));
     contents.push({ role: 'user', parts: [{ text: question }] });
-    const chain = [s.models.gemini || 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash-lite'].filter((m, i, a) => a.indexOf(m) === i);
+    const chain = [s.models.gemini || 'gemini-3.1-flash-lite', 'gemini-3.1-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'].filter((m, i, a) => a.indexOf(m) === i);
     let lastErr;
     for (const model of chain) {
       const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
